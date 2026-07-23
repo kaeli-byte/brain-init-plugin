@@ -44,6 +44,8 @@ NO_OBSIDIAN=false
 NO_SUPPORTING_SKILLS=false
 FORCE=false
 GIT_REMOTE=""
+UPGRADE_HARNESS=false
+VALIDATE_MODE=false
 TODAY=$(date +%Y-%m-%d)
 
 # ── Parse arguments ───────────────────────────────────────────
@@ -71,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       FORCE=true; shift ;;
     --git-remote)
       GIT_REMOTE="$2"; shift 2 ;;
+    --upgrade-harness)
+      UPGRADE_HARNESS=true; shift ;;
+    --validate)
+      VALIDATE_MODE=true; shift ;;
     -*)
       echo "Unknown flag: $1" >&2; exit 1 ;;
     *)
@@ -88,6 +94,203 @@ if [ -z "$VAULT_PATH" ]; then
   echo "Usage: brain-init.sh <vault-path> [options]" >&2
   echo "Run '/brain-init:brain-init --help' for full documentation." >&2
   exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# Special modes: --validate and --upgrade-harness
+# ═══════════════════════════════════════════════════════════════
+
+# Resolve plugin root early for these modes
+_early_plugin_root="$(find_plugin_root 2>/dev/null || echo '')"
+VALIDATE_SCRIPT=""
+if [ -n "$_early_plugin_root" ] && [ -f "$_early_plugin_root/skills/brain-init/scripts/validate-vault.sh" ]; then
+    VALIDATE_SCRIPT="$_early_plugin_root/skills/brain-init/scripts/validate-vault.sh"
+elif [ -f "$(dirname "${BASH_SOURCE[0]}")/validate-vault.sh" ]; then
+    VALIDATE_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/validate-vault.sh"
+elif [ -f "$HOME/deep-tech-wiki/.claude/skills/brain-init/scripts/validate-vault.sh" ]; then
+    VALIDATE_SCRIPT="$HOME/deep-tech-wiki/.claude/skills/brain-init/scripts/validate-vault.sh"
+fi
+
+# ── --validate mode ───────────────────────────────────────────
+if [ "$VALIDATE_MODE" = true ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  brain-init v1.0.0 — Validate mode"
+    echo "  Vault:   $VAULT_PATH"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    if [ -n "$VALIDATE_SCRIPT" ]; then
+        exec bash "$VALIDATE_SCRIPT" "$VAULT_PATH"
+    else
+        echo "ERROR: validate-vault.sh not found." >&2
+        echo "  Expected at: skills/brain-init/scripts/validate-vault.sh (in plugin)" >&2
+        echo "  Or: ~/deep-tech-wiki/.claude/skills/brain-init/scripts/validate-vault.sh (legacy)" >&2
+        exit 1
+    fi
+fi
+
+# ── --upgrade-harness mode ────────────────────────────────────
+if [ "$UPGRADE_HARNESS" = true ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  brain-init v1.0.0 — Upgrade harness mode"
+    echo "  Vault:   $VAULT_PATH"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    if [ ! -d "$VAULT_PATH/wiki" ]; then
+        echo "ERROR: $VAULT_PATH doesn't appear to be a brain vault (no wiki/ directory)." >&2
+        echo "  Use /brain-init:brain-init $VAULT_PATH to create a new vault." >&2
+        exit 1
+    fi
+
+    # Resolve template source (same logic as Phase 0)
+    if [ -n "$TEMPLATE_PATH" ]; then
+        TEMPLATE_PATH="${TEMPLATE_PATH/#\~/$HOME}"
+        [[ "$TEMPLATE_PATH" != /* ]] && TEMPLATE_PATH="$PWD/$TEMPLATE_PATH"
+        TEMPLATE_PATH="${TEMPLATE_PATH//\\//}"; TEMPLATE_PATH="${TEMPLATE_PATH%/}"
+        if [ ! -d "$TEMPLATE_PATH" ]; then
+            echo "ERROR: --template-path '$TEMPLATE_PATH' does not exist." >&2
+            exit 1
+        fi
+        TEMPLATE_SOURCE="$TEMPLATE_PATH"; TEMPLATE_IS_PLUGIN=false
+    elif [ -n "$_early_plugin_root" ] && [ -d "$_early_plugin_root/assets/schemas" ]; then
+        TEMPLATE_SOURCE="$_early_plugin_root"; TEMPLATE_IS_PLUGIN=true
+    elif [ -d "$HOME/deep-tech-wiki/templates/schemas" ]; then
+        TEMPLATE_SOURCE="$HOME/deep-tech-wiki"; TEMPLATE_IS_PLUGIN=false
+    else
+        echo "ERROR: No template source found." >&2
+        echo "  Install the brain-init plugin: /plugin install brain-init@brain-init" >&2
+        exit 1
+    fi
+
+    # Set asset paths (same logic as Phase 0)
+    if [ "$TEMPLATE_IS_PLUGIN" = true ]; then
+        SCHEMAS_SRC="$_early_plugin_root/assets/schemas"
+        HOOKS_SRC="$_early_plugin_root/assets/hooks.json"
+        SETTINGS_SRC="$_early_plugin_root/assets/settings.json"
+        AGENTS_SRC="$_early_plugin_root/assets/agents"
+        CONFIG_SRC="$_early_plugin_root/assets/config"
+        BASES_SRC="$_early_plugin_root/assets/bases"
+        OBSIDIAN_SRC="$_early_plugin_root/assets/obsidian"
+        BUNDLES_SRC="$_early_plugin_root/bundles"
+        DOMAIN_TEMPLATES_SRC="$_early_plugin_root/skills/brain-init/templates"
+        echo "  Template source: $_early_plugin_root (brain-init plugin)"
+    else
+        SCHEMAS_SRC="$TEMPLATE_SOURCE/templates/schemas"
+        HOOKS_SRC="$TEMPLATE_SOURCE/.claude/hooks/hooks.json"
+        SETTINGS_SRC="$TEMPLATE_SOURCE/.claude/settings.json"
+        AGENTS_SRC="$TEMPLATE_SOURCE/.claude/agents"
+        CONFIG_SRC="$TEMPLATE_SOURCE/config"
+        BASES_SRC="$TEMPLATE_SOURCE/Templates/Bases"
+        OBSIDIAN_SRC="$TEMPLATE_SOURCE/.obsidian"
+        BUNDLES_SRC="$TEMPLATE_SOURCE/.claude/skills"
+        DOMAIN_TEMPLATES_SRC="$TEMPLATE_SOURCE/.claude/skills/brain-init/templates"
+        echo "  Template source: $TEMPLATE_SOURCE (legacy)"
+    fi
+
+    UPGRADED=0
+
+    # Update hooks.json (preserve vault path)
+    echo ""
+    echo "Updating harness files..."
+    if [ -f "$HOOKS_SRC" ]; then
+        sed "s|~/deep-tech-wiki|$VAULT_PATH|g" "$HOOKS_SRC" > "$VAULT_PATH/.claude/hooks/hooks.json"
+        echo "  hooks.json: updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update settings.json
+    if [ -f "$SETTINGS_SRC" ]; then
+        cp "$SETTINGS_SRC" "$VAULT_PATH/.claude/settings.json"
+        echo "  settings.json: updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update agent definitions
+    if [ -d "$AGENTS_SRC" ]; then
+        AGENT_UPDATED=0
+        for f in "$AGENTS_SRC"/*.md; do
+            [ -f "$f" ] || continue
+            cp "$f" "$VAULT_PATH/.claude/agents/"
+            AGENT_UPDATED=$((AGENT_UPDATED + 1))
+        done
+        echo "  Agent definitions: $AGENT_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update second-brain skill
+    SECOND_BRAIN_SRC="$BUNDLES_SRC/second-brain"
+    [ "$TEMPLATE_IS_PLUGIN" != true ] && [ -d "$TEMPLATE_SOURCE/.claude/skills/second-brain" ] && \
+        SECOND_BRAIN_SRC="$TEMPLATE_SOURCE/.claude/skills/second-brain"
+    if [ -f "$SECOND_BRAIN_SRC/SKILL.md" ]; then
+        mkdir -p "$VAULT_PATH/.claude/skills/second-brain"
+        cp "$SECOND_BRAIN_SRC/SKILL.md" "$VAULT_PATH/.claude/skills/second-brain/"
+        for role in researcher analyst curator; do
+            [ -f "$SECOND_BRAIN_SRC/${role}.md" ] && \
+                cp "$SECOND_BRAIN_SRC/${role}.md" "$VAULT_PATH/.claude/skills/second-brain/"
+        done
+        echo "  second-brain skill: updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update schemas (add new, overwrite existing)
+    if [ -d "$SCHEMAS_SRC" ]; then
+        SCHEMA_NEW=$(ls "$SCHEMAS_SRC"/*.yaml 2>/dev/null | wc -l | tr -d ' ')
+        cp "$SCHEMAS_SRC"/*.yaml "$VAULT_PATH/templates/schemas/" 2>/dev/null || true
+        echo "  Schemas: $SCHEMA_NEW files updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update Base views
+    if [ -d "$BASES_SRC" ]; then
+        BASE_UPDATED=0
+        for f in "$BASES_SRC"/*.base; do
+            [ -f "$f" ] || continue
+            cp "$f" "$VAULT_PATH/Templates/Bases/"
+            BASE_UPDATED=$((BASE_UPDATED + 1))
+        done
+        echo "  Base views: $BASE_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update config docs
+    for f in materiality.md retrieval.md page-templates.md; do
+        [ -f "$CONFIG_SRC/$f" ] && cp "$CONFIG_SRC/$f" "$VAULT_PATH/config/"
+    done
+    echo "  Config docs: updated"; UPGRADED=$((UPGRADED + 1))
+
+    # Update types.json
+    if [ -f "$OBSIDIAN_SRC/types.json" ]; then
+        cp "$OBSIDIAN_SRC/types.json" "$VAULT_PATH/.obsidian/types.json"
+        echo "  Obsidian types.json: updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Update supporting skills if they exist in the vault
+    SKILLS_UPDATED=0
+    for skill in mineru-batch cfi-filings sec-edgar tianyancha; do
+        SKILL_SRC="$BUNDLES_SRC/$skill"
+        if [ -d "$SKILL_SRC" ] && [ -d "$VAULT_PATH/.claude/skills/$skill" ]; then
+            cp -r "$SKILL_SRC"/* "$VAULT_PATH/.claude/skills/$skill/" 2>/dev/null || true
+            SKILLS_UPDATED=$((SKILLS_UPDATED + 1))
+        fi
+    done
+    if [ "$SKILLS_UPDATED" -gt 0 ]; then
+        echo "  Supporting skills: $SKILLS_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Append log entry
+    LOG_LINE="## [${TODAY}] brain-init | Harness upgraded | brain-init v1.0.0"
+    if ! grep -qF "$LOG_LINE" "$VAULT_PATH/wiki/log.md" 2>/dev/null; then
+        printf "\n%s\n- %d harness components updated from %s\n" "$LOG_LINE" "$UPGRADED" \
+            "$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo 'brain-init plugin' || echo "$TEMPLATE_SOURCE")" \
+            >> "$VAULT_PATH/wiki/log.md"
+    fi
+
+    # Count preserved pages for the report
+    PAGE_COUNT=$(find "$VAULT_PATH/wiki" -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Harness upgrade complete"
+    echo "  Updated: $UPGRADED harness components"
+    echo "  Preserved: $PAGE_COUNT wiki pages + raw/ content"
+    echo ""
+    echo "  Next: Run /lint to verify vault health"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    exit 0
 fi
 
 # ── Resolve paths ─────────────────────────────────────────────
