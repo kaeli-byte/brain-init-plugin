@@ -1,0 +1,29 @@
+# Query Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/queries/ page
+
+# Required fields
+query_id: query-{uuid}                          # Content-hash-based: first 8 chars of SHA-256 of kebab-question+date
+question: "How does Apple's M4 NPU compare to Qualcomm's Hexagon NPU?"  # The original question
+query_date: 2026-07-17                          # Date the question was asked
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+sources_consulted: [src-apple-m4-whitepaper]     # Sources used to answer
+wiki_pages_read: [technology-apple-neural-engine] # Wiki pages referenced
+answer_summary: "..."                           # Brief answer
+answer_type: comparison                         # One of: comparison | assessment | forecast | explanation
+
+# Optional — populate if the answer generated new content
+new_claims_generated: [claim-m4-vs-hexagon-inference-latency]
+new_pages_created: [analysis-m4-hexagon-comparison]
+tags: [query, comparison, npu, apple, qualcomm]
+
+# Body sections required:
+# # Question
+# ## Detailed Answer
+# ## Evidence & Citations
+# ## Confidence Assessment
+# ## Knowledge Gaps Identified
+# ## Follow-up Questions
+# ## Changelog
+
+# Key rule: good answers compound — file them, don't let them disappear into chat history

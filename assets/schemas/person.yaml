@@ -1,0 +1,28 @@
+# Person Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/people/ page
+
+# Required fields
+person_id: person-{uuid}                        # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: Tim Cook                                  # Full name
+role: CEO                                       # Current role
+company: entity-apple                           # Current company
+background: [operations, supply-chain]          # Professional background areas
+influence_score: 8                              # 1-10 scale
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Optional — populate when available
+key_decisions: [decision-apple-silicon-transition]  # Notable decisions made
+public_statements: [claim-apple-privacy-commitment] # Public positions taken
+tags: [person, executive, apple]
+
+# Body sections required:
+# # Profile
+# ## Career Trajectory
+# ## Key Decisions & Impact
+# ## Public Positions
+# ## Network & Influence (MANDATORY — map connections to people/companies)
+# ## Related People
+# ## Changelog
+
+# Key rule: network connections must be mapped — who do they work with, report to, influence?

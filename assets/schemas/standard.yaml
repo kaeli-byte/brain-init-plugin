@@ -1,0 +1,29 @@
+# Standard Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/standards/ page
+
+# Required fields
+standard_id: standard-{uuid}                    # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: IEEE 802.11be (Wi-Fi 7)                  # Standard name
+issuing_body: IEEE                              # Organization that issued it
+status: published                               # One of: published | draft | withdrawn
+publish_date: 2024-01-01                        # Publication date
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+mandatory_in: [jurisdiction-us, jurisdiction-eu] # Where it's required
+
+# Linkage
+affected_products: [product-wifi-router]
+affected_technologies: [technology-ofdma]
+
+# Optional
+tags: [standard, wireless, ieee, wifi]
+
+# Body sections required:
+# # Standard Overview
+# ## Technical Specifications
+# ## Compliance Requirements
+# ## Market Adoption (assess relevance)
+# ## Competitive Implications
+# ## Changelog
+
+# Key rule: market adoption assessment is part of the standard's relevance evaluation

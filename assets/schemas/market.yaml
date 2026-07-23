@@ -1,0 +1,35 @@
+# Market Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/markets/ page
+
+# Required fields
+market_id: market-{uuid}                        # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: Global AI Semiconductor Market            # Market name
+tam: "$X billion (2025)"                        # Total Addressable Market with year
+sam: "$Y billion (addressable)"                 # Serviceable Addressable Market
+som: "$Z billion (obtainable, 5-year)"          # Serviceable Obtainable Market
+cagr: "XX% (2025-2030)"                         # Compound Annual Growth Rate with period
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+key_players: [entity-nvidia, entity-amd]
+
+# Linkage
+key_technologies: [technology-gpu]
+key_applications: [application-llm-training]
+regulatory_drivers: [regulation-chips-act]
+market_reports: [src-mckinsey-ai-semiconductor-2025]
+
+# Optional
+tags: [market, ai, semiconductor, sizing]
+
+# Body sections required:
+# # Market Analysis
+# ## Market Structure
+# ## Growth Drivers
+# ## Constraints & Risks
+# ## Competitive Dynamics
+# ## Value Chain
+# ## Forecast Methodology (MANDATORY — explain how numbers were derived)
+# ## Data Sources & Limitations
+# ## Changelog
+
+# Key rule: forecast methodology must be explicitly stated — how were TAM/SAM/SOM/CAGR derived?

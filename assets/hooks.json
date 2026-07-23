@@ -1,0 +1,79 @@
+{
+  "hooks": [
+    {
+      "name": "wiki-session-start",
+      "event": "SessionStart",
+      "description": "Load wiki schema and index on every session start",
+      "command": "#!/bin/bash\nVAULT=$CLAUDE_PROJECT_DIR\necho \"[wiki] v$(grep -oP 'Schema v\\K[^ ]*' $VAULT/CLAUDE.md 2>/dev/null || echo '?') | pages:$(find $VAULT/wiki -name '*.md' 2>/dev/null | wc -l | tr -d ' ') | last:$(tail -1 $VAULT/wiki/log.md 2>/dev/null || echo 'none')\""
+    },
+    {
+      "name": "wiki-auto-lint-on-edit",
+      "event": "PostToolUse",
+      "description": "Trigger lint reminder when wiki pages are edited",
+      "matcher": "tool == 'Edit' && tool_input.file_path matches 'wiki/.*\\.md$'",
+      "command": "#!/bin/bash\necho '[Wiki Hook] Page edited. Consider running /lint if this was a significant update.'"
+    },
+    {
+      "name": "wiki-index-reminder",
+      "event": "PostToolUse",
+      "description": "Remind to update index when new pages are created",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/.*\\.md$'",
+      "command": "#!/bin/bash\necho '[Wiki Hook] New page created. Update wiki/index.md with new entry.'"
+    },
+    {
+      "name": "wiki-log-stop",
+      "event": "Stop",
+      "description": "Log session end to wiki log",
+      "command": "#!/bin/bash\nVAULT=$CLAUDE_PROJECT_DIR\nSESSION_ID=$(date +%s)\necho \"## [$(date +%Y-%m-%d)] session-end | $(basename $VAULT) | session-$SESSION_ID\" >> $VAULT/wiki/log.md"
+    },
+    {
+      "name": "wiki-claim-validation",
+      "event": "PostToolUse",
+      "description": "Validate claim pages have proper sourcing and last_reviewed after write",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/claims/.*\\.md$'",
+      "command": "#!/bin/bash\n# Parse file_path from Claude Code hook input JSON\nFILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\nif [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then\n  if ! grep -q 'source_evidence:' \"$FILE\"; then\n    echo '[Wiki Hook] WARNING: Claim page missing source_evidence frontmatter' >&2\n  fi\n  if ! grep -q 'last_reviewed:' \"$FILE\"; then\n    echo '[Wiki Hook] WARNING: Claim page missing last_reviewed frontmatter' >&2\n  fi\nelse\n  echo '[Wiki Hook] Could not determine file path for claim validation' >&2\nfi"
+    },
+    {
+      "name": "wiki-last-reviewed-reminder",
+      "event": "PostToolUse",
+      "description": "Remind to bump last_reviewed when editing existing wiki pages",
+      "matcher": "tool == 'Edit' && tool_input.file_path matches 'wiki/.*\\.md$'",
+      "command": "#!/bin/bash\nFILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\nTODAY=$(date +%Y-%m-%d)\nif [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then\n  if grep -q 'last_reviewed:' \"$FILE\"; then\n    CURRENT=$(grep -oP 'last_reviewed:\\s*\\K[0-9]{4}-[0-9]{2}-[0-9]{2}' \"$FILE\" | head -1)\n    if [ \"$CURRENT\" != \"$TODAY\" ] && [ -n \"$CURRENT\" ]; then\n      echo \"[Wiki Hook] last_reviewed is $CURRENT — consider bumping to $TODAY\"\n    fi\n  fi\nfi"
+    },
+    {
+      "name": "wiki-security-scan",
+      "event": "PostToolUse",
+      "description": "Prevent LLM from writing sensitive financial data to unencrypted locations",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/.*\\.md$'",
+      "command": "#!/bin/bash\n# Parse file_path from Claude Code hook input JSON\nFILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\nif [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then\n  if grep -qE '(SSN|social.security|\\b\\d{3}-\\d{2}-\\d{4}\\b)' \"$FILE\"; then\n    echo '[Wiki Hook] CRITICAL: Potential PII detected in wiki page' >&2\n    exit 1\n  fi\nelse\n  echo '[Wiki Hook] Could not determine file path for security scan' >&2\nfi"
+    },
+    {
+      "name": "wiki-evidence-locator-check",
+      "event": "PostToolUse",
+      "description": "Warn when a supported claim lacks exact evidence locators",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/claims/.*\\.md$'",
+      "command": "#!/bin/bash\nFILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\nif [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then\n  if grep -q 'status: supported' \"$FILE\" && ! grep -qE '\\[S-[a-fA-F0-9]{16},' \"$FILE\"; then\n    echo '[Wiki Hook] WARNING: Supported claim lacks exact evidence locator [S-<id>, p. N]' >&2\n  fi\nfi"
+    },
+    {
+      "name": "wiki-investigation-integrity",
+      "event": "PostToolUse",
+      "description": "Warn when an investigation page is missing required sections",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/investigations/.*\\.md$'",
+      "command": "#!/bin/bash\nFILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\nif [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then\n  REQUIRED=(\"Decision question\" \"Scope and definitions\" \"Current thesis\" \"Supporting evidence\" \"Counterevidence\" \"Unknowns\" \"Invalidation conditions\" \"Implications\" \"Change history\")\n  MISSING=\"\"\n  for section in \"${REQUIRED[@]}\"; do\n    if ! grep -q \"^## $section$\" \"$FILE\"; then\n      MISSING=\"$MISSING $section\"\n    fi\n  done\n  if [ -n \"$MISSING\" ]; then\n    echo \"[Wiki Hook] WARNING: Investigation missing required sections:$MISSING\" >&2\n  fi\nfi"
+    },
+    {
+      "name": "wiki-post-ingest-verification",
+      "event": "PostToolUse",
+      "description": "Run orphan and cross-reference check after source page writes",
+      "matcher": "tool == 'Write' && tool_input.file_path matches 'wiki/sources/.*\\.md$'",
+      "command": "#!/bin/bash\nVAULT=$CLAUDE_PROJECT_DIR\nSOURCE_FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get('file_path',''))\" 2>/dev/null || echo \"\")\necho \"[Wiki Hook] Source page written. Quick verification:\"\necho \"  - Orphan claims: $(for c in $VAULT/wiki/claims/*.md; do grep -l \"$(basename \"$SOURCE_FILE\" .md)\" \"$c\" 2>/dev/null; done | wc -l | tr -d ' ') claim(s) reference this source\"\necho \"  - Total wiki pages: $(find $VAULT/wiki -name '*.md' | wc -l | tr -d ' ')\"\necho \"  - Run /lint for full cross-reference integrity check.\""
+    },
+    {
+      "name": "wiki-qmd-refresh-reminder",
+      "event": "PostToolUse",
+      "description": "Remind to re-index qmd after 3+ wiki writes since last refresh",
+      "matcher": "(tool == 'Write' || tool == 'Edit') && (tool_input.file_path matches 'wiki/.*\\.md$' || tool_input.file_path matches 'config/purpose\\.md$' || tool_input.file_path matches 'config/materiality\\.md$' || tool_input.file_path matches 'config/retrieval\\.md$' || tool_input.file_path matches 'CLAUDE\\.md$')",
+      "command": "#!/bin/bash\nVAULT=$CLAUDE_PROJECT_DIR\n\n# Ensure timestamp file exists\nif [ ! -f \"$VAULT/.qmd-last-refresh\" ]; then\n  touch \"$VAULT/.qmd-last-refresh\"\nfi\n\n# Count wiki pages changed since last qmd refresh\nCOUNT=$(find \"$VAULT/wiki\" \"$VAULT/config\" -name '*.md' -newer \"$VAULT/.qmd-last-refresh\" 2>/dev/null | wc -l | tr -d ' ')\n\nif [ \"$COUNT\" -gt 3 ] 2>/dev/null; then\n  echo \"[Wiki Hook] $COUNT pages modified since last qmd refresh. Run: qmd update && qmd embed && touch .qmd-last-refresh\"\nfi"
+    }
+  ]
+}

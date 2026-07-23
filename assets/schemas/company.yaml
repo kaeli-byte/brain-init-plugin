@@ -1,0 +1,127 @@
+# Company Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/companies/ page
+
+# Required fields
+company_id: entity-{uuid}                                       # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+legal_name: Apple Inc.                                          # Full legal name
+legal_name_zh: 富奥汽车零部件股份有限公司
+ticker: AAPL                                                    # Stock ticker (if public)
+founded: 1976-04-01                                             # Founding date
+headquarters: Cupertino, CA                                     # HQ location
+website: http://www.fawer.com.cn
+market_cap: "$3.2T (as of 2026-07)"                             # Market cap with date
+sector: Technology                                              # Broad sector
+industry: [industry-consumer-electronics]                       # Industry classifications
+sub_industries: [Chassis Systems, Suspension Systems]
+employees: ~8,145 (estimated from R&D 1,185 at 14.55%)
+controlling_shareholder: FAW Group / Jilin Province SASAC (state-owned mixed-ownership enterprise)
+ceo: 李俊新 (Li Junxin) -- Legal Representative
+cfo: 李志勇 (Li Zhiyong) -- Head of Accounting
+board_secretary: 张宁 (Zhang Ning)
+auditor: 信永中和会计师事务所 (ShineWing CPAs)
+financial_health: strong                                        # One of: strong | stable | stressed | distressed
+strategic_position: leader                                      # One of: leader | challenger | follower | niche
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Linkage
+key_products: [product-iphone-16]
+key_technologies: [technology-3nm]
+key_people: [person-tim-cook]
+competitors: [entity-samsung]
+partners: [entity-tsmc]
+regulatory_exposure: [regulation-eu-digital-markets-act]
+
+# Optional
+tags: [company, mega-cap, consumer-tech]
+
+# ── Body Sections (Thin-Claim-Index Pattern) ──
+#
+# EVERY section must be present as a heading. Instead of writing content inline,
+# each section contains wikilinks to claim pages that hold the sourced evidence.
+# The company page is a structured index — it maps topics to claims, and claims
+# carry the narrative, source citations, and evidence. This keeps company pages
+# navigable by topic while all evidentiary weight lives in claim pages where
+# source_evidence (passage + context) belongs.
+#
+# Required sections (in order):
+#
+# # Company Profile
+#   One-paragraph summary. This is the ONE section with inline content — a brief
+#   description of what the company is, its scale, and its strategic position.
+#
+# ## Business Model
+#   [[claim-*]] wikilinks covering: how the company makes money, revenue model,
+#   customer segments, pricing power. Answers question 1 of the 10 questions.
+#
+# ## Revenue Breakdown
+#   [[claim-*]] wikilinks covering: revenue by segment/geography/product line,
+#   organic vs. acquired growth decomposition. Answers question 2.
+#
+# ## Margin & Profitability
+#   [[claim-*]] wikilinks covering: gross/operating/net margin trends (3-5yr),
+#   margin drivers (pricing, mix, efficiency, input costs). Answers question 3.
+#
+# ## Cash Flow & Capital Allocation
+#   [[claim-*]] wikilinks covering: FCF conversion, capex, dividends, buybacks,
+#   M&A, debt paydown. Answers questions 4 and 9.
+#
+# ## Balance Sheet & Debt
+#   [[claim-*]] wikilinks covering: debt/equity, maturity schedule, liquidity,
+#   leverage ratios. Answers question 5.
+#
+# ## R&D Strategy
+#   [[claim-*]] wikilinks covering: R&D intensity, focus areas, IP generation,
+#   technology roadmap.
+#
+# ## Supply Chain
+#   [[claim-*]] wikilinks covering: key suppliers, vertical integration,
+#   manufacturing footprint, logistics, raw material exposure.
+#
+# ## Competitive Position
+#   [[claim-*]] wikilinks covering: market share, moat assessment (switching costs,
+#   scale, IP, network effects, regulatory barriers), moat trend (widening/narrowing).
+#   Answers questions 8 and 7.
+#
+# ## Risk Factors
+#   [[claim-*]] wikilinks covering: company-specific risks (not boilerplate) —
+#   customer concentration, regulatory exposure, technology disruption, commodity
+#   dependence, FX, geopolitical. Answers question 6.
+#
+# ## Strategic Outlook
+#   [[claim-*]] wikilinks covering: management guidance, growth initiatives,
+#   strategic bets, market expansion plans, restructuring.
+#
+# ## Financial Timeline
+#   Table: Year | Revenue | R&D | CapEx | Net Income | Source
+#   Each "Source" cell is a [[src-*]] or [[claim-*]] wikilink.
+#
+# ## Patent Portfolio
+#   [[claim-*]] wikilinks covering: patent count, key families, IP strategy.
+#   Also link [[patent-family-*]] pages directly if they exist.
+#
+# ## Subsidiaries & Structure
+#   [[claim-*]] wikilinks covering: key subsidiaries, JVs, corporate structure.
+#
+# ## Management & Governance
+#   [[claim-*]] wikilinks covering: management track record, governance quality,
+#   incentive alignment. Answers question 10 (is management trustworthy?).
+#
+# ## Sources
+#   MUST contain [[src-*]] wikilinks linking back to every ingested source about
+#   this company. This is the counterpart to the source page's [[company-*]] link.
+#   These two links are the most critical connections in the wiki.
+#
+# ## Related Companies
+#   [[company-*]] wikilinks to peers, customers, suppliers, competitors.
+#   Brief annotation per link explaining the relationship.
+#
+# ## Related Analyses
+#   [[analysis-*]] wikilinks to deep-dive analyses involving this company.
+#
+# ## Changelog
+#   Append-only: date, description of change.
+
+# Key rule: Every source page MUST contain a [[company-<name>]] wikilink.
+#   Every company page MUST contain a [[src-<title>]] wikilink back to the source.
+#   These two links are the most critical connections in the wiki.

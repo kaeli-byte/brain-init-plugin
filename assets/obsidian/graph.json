@@ -1,0 +1,51 @@
+{
+  "collapse-filter": false,
+  "search": "-path:raw -path:config -path:tests -path:templates  -file:log -file:claude ",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:wiki/companies  ",
+      "color": {
+        "a": 1,
+        "rgb": 14701138
+      }
+    },
+    {
+      "query": "path:wiki/sources  ",
+      "color": {
+        "a": 1,
+        "rgb": 14725458
+      }
+    },
+    {
+      "query": "path:wiki/claims  ",
+      "color": {
+        "a": 1,
+        "rgb": 11657298
+      }
+    },
+    {
+      "query": "path:wiki/analyses  ",
+      "color": {
+        "a": 1,
+        "rgb": 7935
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.71249131944444,
+  "lineSizeMultiplier": 0.585321180555556,
+  "collapse-forces": false,
+  "centerStrength": 0,
+  "repelStrength": 9.05208333333333,
+  "linkStrength": 0.300607638888889,
+  "linkDistance": 30,
+  "scale": 0.026906235561832293,
+  "close": true
+}

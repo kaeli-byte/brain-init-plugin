@@ -1,0 +1,71 @@
+filters:
+  and:
+    - file.tags.contains("source")
+    - '!file.name.contains("Template")'
+properties:
+  file.name:
+    displayName: Source
+  note.source_type:
+    displayName: Type
+  note.publisher:
+    displayName: Publisher
+  note.date_published:
+    displayName: Published
+  note.date_ingested:
+    displayName: Ingested
+  note.reliability:
+    displayName: Reliability
+  note.materiality:
+    displayName: Materiality
+  note.last_reviewed:
+    displayName: Last Reviewed
+views:
+  - type: table
+    name: All Sources
+    order:
+      - file.name
+      - source_type
+      - date_published
+      - reliability
+      - materiality
+      - last_reviewed
+    sort:
+      - property: date_published
+        direction: DESC
+  - type: table
+    name: By Reliability
+    order:
+      - file.name
+      - reliability
+      - source_type
+      - date_published
+    sort:
+      - property: reliability
+        direction: ASC
+      - property: date_published
+        direction: DESC
+  - type: table
+    name: By Type
+    order:
+      - file.name
+      - source_type
+      - date_published
+      - reliability
+    sort:
+      - property: source_type
+        direction: ASC
+      - property: date_published
+        direction: DESC
+  - type: table
+    name: By Company
+    filters:
+      and:
+        - file.outlinks.contains(this.file)
+    order:
+      - file.name
+      - source_type
+      - date_published
+      - reliability
+    sort:
+      - property: date_published
+        direction: DESC

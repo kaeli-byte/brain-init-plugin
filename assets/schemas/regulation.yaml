@@ -1,0 +1,33 @@
+# Regulation Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/regulations/ page
+
+# Required fields
+regulation_id: regulation-{uuid}                # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: EU AI Act                                 # Regulation name
+jurisdiction: European Union                    # Governing jurisdiction
+effective_date: 2025-08-01                      # When it takes effect
+status: enacted                                 # One of: enacted | proposed | draft | repealed
+scope: [industry-ai, industry-semiconductor]    # Industries/domains covered
+key_requirements: [transparency, risk-classification]
+affected_companies: [entity-openai]
+affected_technologies: [technology-llm]
+compliance_deadlines: [2026-02-01]              # Key dates
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+penalties: "Up to 7% global turnover"           # Non-compliance consequences
+related_regulations: [regulation-gdpr]
+
+# Optional
+tags: [regulation, eu, ai, compliance]
+
+# Body sections required:
+# # Regulatory Analysis
+# ## Key Provisions
+# ## Implementation Timeline (MANDATORY — concrete dates)
+# ## Compliance Requirements
+# ## Industry Impact Assessment
+# ## Competitive Implications
+# ## Related Standards
+# ## Changelog
+
+# Key rule: compliance timeline with concrete dates is mandatory

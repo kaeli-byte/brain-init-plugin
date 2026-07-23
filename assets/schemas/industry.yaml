@@ -1,0 +1,31 @@
+# Industry Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/industries/ page
+
+# Required fields
+industry_id: industry-{uuid}                    # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: Semiconductor Manufacturing              # Industry name
+naics_code: 334413                              # NAICS classification code
+value_chain: [design, fabrication, packaging, testing, equipment]  # Value chain stages
+key_companies: [entity-tsmc, entity-asml]
+key_technologies: [technology-euv-lithography]
+key_regulations: [regulation-export-controls]
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Optional
+market_size: "$X billion"                       # Total market size
+growth_rate: "XX%"                              # Annual growth rate
+consolidation_trend: increasing                 # One of: increasing | stable | fragmenting
+tags: [industry, semiconductor, manufacturing]
+
+# Body sections required:
+# # Industry Overview
+# ## Value Chain (MANDATORY — map all stages)
+# ## Competitive Structure
+# ## Regulatory Environment
+# ## Technology Trends
+# ## Investment Themes
+# ## Risk Factors
+# ## Changelog
+
+# Key rule: value chain mapping is mandatory — every stage must be documented

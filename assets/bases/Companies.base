@@ -1,0 +1,59 @@
+filters:
+  and:
+    - file.tags.contains("company")
+    - '!file.name.contains("Template")'
+properties:
+  file.name:
+    displayName: Company
+  note.legal_name:
+    displayName: Legal Name
+  note.ticker:
+    displayName: Ticker
+  note.sector:
+    displayName: Sector
+  note.financial_health:
+    displayName: Financial Health
+  note.strategic_position:
+    displayName: Position
+  note.headquarters:
+    displayName: HQ
+  note.last_reviewed:
+    displayName: Last Reviewed
+views:
+  - type: table
+    name: All Companies
+    order:
+      - file.name
+      - legal_name
+      - legal_name_zh
+      - ticker
+      - sector
+      - financial_health
+      - strategic_position
+      - last_reviewed
+      - exchange
+    sort:
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: By Financial Health
+    order:
+      - file.name
+      - financial_health
+      - strategic_position
+      - sector
+      - last_reviewed
+    sort:
+      - property: financial_health
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: Recently Reviewed
+    order:
+      - file.name
+      - last_reviewed
+      - financial_health
+    sort:
+      - property: last_reviewed
+        direction: DESC

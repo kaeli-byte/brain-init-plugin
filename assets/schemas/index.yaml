@@ -1,0 +1,72 @@
+# Index Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating the initial wiki/index.md or validating it during lint
+#
+# The index.md is the living catalog — must be updated on every ingest,
+# reconcile, investigation, or analysis creation.
+
+# Required frontmatter:
+# last_reviewed: YYYY-MM-DD                     # Updated on every index rebuild — used by /lint for staleness checks
+
+# Required structure (use the exact section ordering below):
+
+# # Deep-Tech Intelligence Wiki — Index
+#
+# ## Sources ({{count}})
+# {{list with one-line summary and date}}
+#
+# ## Claims ({{count}})
+# {{list by confidence level}}
+#
+# ## Companies ({{count}})
+# {{list by market cap or sector}}
+#
+# ## Concepts ({{count}})
+# {{list by maturity}}
+#
+# ## Technologies ({{count}})
+# {{list by maturity}}
+#
+# ## Patent Families ({{count}})
+# {{list by assignee}}
+#
+# ## Markets ({{count}})
+# {{list by size}}
+#
+# ## Analyses ({{count}})
+# {{list by date}}
+#
+# ## Syntheses ({{count}})
+# {{list by date}}
+#
+# ## Queries ({{count}})
+# {{list by date}}
+#
+# ## Industries ({{count}})
+# {{list}}
+#
+# ## Regulations ({{count}})
+# {{list by jurisdiction}}
+#
+# ## Standards ({{count}})
+# {{list by status}}
+#
+# ## Applications ({{count}})
+# {{list by readiness}}
+#
+# ## Processes ({{count}})
+# {{list by industry}}
+#
+# ## People ({{count}})
+# {{list by influence}}
+#
+# ## Products ({{count}})
+# {{list by launch date}}
+#
+# ---
+# Last updated: YYYY-MM-DD by agent-{session}
+# Total pages: {{total}}
+
+# Key rule: must reflect actual counts. A stale index is a lint error.
+#   Update after every ingest, reconcile, investigation, or analysis creation.
+#   The /lint command verifies counts against actual files on disk.

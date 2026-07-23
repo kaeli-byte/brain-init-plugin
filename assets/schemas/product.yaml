@@ -1,0 +1,31 @@
+# Product Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/products/ page
+
+# Required fields
+product_id: product-{uuid}                      # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: iPhone 16 Pro                             # Product name
+manufacturer: entity-apple                      # Who makes it
+launch_date: 2025-09-20                         # Release date
+category: smartphone                            # Product category
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+key_technologies: [technology-3nm]
+performance_claims: [claim-iphone16-a18-pro-benchmark]
+market: [market-premium-smartphone]             # Target market
+competitors: [product-samsung-s24-ultra]        # Competing products
+
+# Optional
+reviews: [src-anandtech-iphone16-review]        # Notable reviews/benchmarks
+tags: [product, smartphone, apple, flagship]
+
+# Body sections required:
+# # Product Profile
+# ## Specifications
+# ## Key Features
+# ## Performance Analysis
+# ## Competitive Comparison (MANDATORY — link to competitor products with benchmarks)
+# ## Market Reception
+# ## Lifecycle Stage
+# ## Changelog
+
+# Key rule: competitive comparison is mandatory — link to specific competitor products

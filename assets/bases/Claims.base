@@ -1,0 +1,84 @@
+filters:
+  and:
+    - file.tags.contains("claim")
+    - '!file.name.contains("Template")'
+properties:
+  file.name:
+    displayName: Claim
+  note.claim_text:
+    displayName: Text
+  note.confidence:
+    displayName: Confidence
+  note.status:
+    displayName: Status
+  note.first_seen:
+    displayName: First Seen
+  note.last_verified:
+    displayName: Last Verified
+  note.last_reviewed:
+    displayName: Last Reviewed
+views:
+  - type: table
+    name: All Claims
+    order:
+      - file.name
+      - confidence
+      - status
+      - last_reviewed
+    sort:
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: By Confidence
+    order:
+      - file.name
+      - claim_text
+      - confidence
+      - status
+      - last_reviewed
+    sort:
+      - property: confidence
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: By Status
+    order:
+      - file.name
+      - claim_text
+      - status
+      - confidence
+      - last_reviewed
+    sort:
+      - property: status
+        direction: ASC
+      - property: file.name
+        direction: ASC
+  - type: table
+    name: Stale (90+ days)
+    filters:
+      and:
+        - last_reviewed < date(today) - dur(90d)
+    order:
+      - file.name
+      - last_reviewed
+      - status
+      - confidence
+    sort:
+      - property: last_reviewed
+        direction: ASC
+  - type: table
+    name: By Company
+    filters:
+      and:
+        - file.outlinks.contains(this.file)
+    order:
+      - file.name
+      - claim_text
+      - confidence
+      - status
+    sort:
+      - property: confidence
+        direction: ASC
+      - property: file.name
+        direction: ASC

@@ -1,0 +1,39 @@
+# Patent Family Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/patent-families/ page
+
+# Required fields
+patent_family_id: pf-{uuid}                     # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+title: "Neural Processing Unit Architecture"     # Patent title
+assignee: entity-apple                          # Company/person who owns the patent
+inventors: [person-johnny-srouji]               # Named inventors
+first_filed: 2022-03-15                         # Earliest priority date
+priority_country: US                            # Country of first filing
+family_members: [US12345678, EP98765432]        # Patent numbers across jurisdictions
+status: granted                                 # One of: granted | pending | rejected | expired
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+key_claims: [claim-1, claim-7, claim-12]        # Independent claims (claim numbers)
+
+# Citation network
+cited_by: [patent-family-qualcomm-npu]          # Who cites this patent
+cites: [patent-family-intel-npu-2018]           # What this patent cites
+
+# Linkage
+technologies: [technology-neural-engine]
+products: [product-iphone-neural-engine]
+market_relevance: high                          # One of: high | medium | low
+
+# Optional
+tags: [patent, npu, apple, ai-hardware]
+
+# Body sections required:
+# # Patent Family Analysis
+# ## Claim Mapping (MANDATORY)
+# ## Prior Art Landscape
+# ## Freedom-to-Operate Assessment
+# ## Licensing Implications
+# ## Competitive Significance
+# ## Related Patents
+# ## Changelog
+
+# Key rule: independent claims must be mapped and analyzed

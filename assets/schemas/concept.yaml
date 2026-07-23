@@ -1,0 +1,35 @@
+# Concept Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/concepts/ page
+
+# Required fields
+concept_id: concept-{uuid}                      # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: Mixture of Experts                        # Concept name
+definition: >-                                  # Clear, one-paragraph definition
+  A neural network architecture where multiple expert sub-networks
+  are selectively activated by a gating mechanism for each input.
+maturity: established                           # One of: theoretical | emerging | established | declining
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Linkage
+also_known_as: [MoE, Sparse Mixture of Experts]
+related_concepts: [concept-sparse-computation]
+related_technologies: [technology-llm]
+related_claims: [claim-moe-5x-efficiency-gain]
+
+# Optional
+tags: [concept, architecture, machine-learning]
+
+# Body sections required:
+# # Concept
+# ## Definition
+# ## Key Principles
+# ## Examples in Practice
+# ## Related Concepts
+# ## Related Technologies
+# ## Changelog
+
+# Key rule: concepts are ABSTRACT ideas and methodologies only.
+#   If it has concrete performance numbers → technologies/
+#   If it's a marketable artifact → products/
+#   Concepts are the glossary that ties the wiki together.

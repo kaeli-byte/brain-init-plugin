@@ -1,0 +1,83 @@
+# Claim Page Schema
+# The atomic unit of intelligence — every claim is a falsifiable statement with evidence.
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/claims/ page
+
+# Required fields
+claim_id: claim-{uuid}                                          # Content-hash-based: first 8 chars of SHA-256 of kebab-title
+claim_text: "Apple's M4 chip achieves 15% better performance-per-watt than M3"  # The falsifiable statement
+confidence: high                                                # One of: high | medium | low — our subjective certainty
+status: confirmed                                               # One of: confirmed | plausible | disputed | debunked | superseded
+
+# source_evidence — structured format (PREFERRED, YAML-safe, queryable):
+source_evidence:
+  - source: "[[src-apple-2025-10k]]"                            # Wikilink to source page
+    passage: "M4 achieves 15% better perf/watt vs M3"           # Verbatim passage or data point
+    context: "Page 42, Manufacturing Efficiency section"        # Where in the source + surrounding context
+
+# Flat format (LEGACY — only for single-line entries with NO special YAML characters):
+source_evidence: ["[[src-apple-2025-10k]]", "[[src-apple-m4-whitepaper]]"]
+
+# Evidence lifecycle (track over time)
+first_seen: 2026-07-17                                          # Date first extracted from a source
+last_verified: 2026-07-17                                       # Date last checked against evidence
+last_reviewed: 2026-07-17                                       # Date last reviewed for quality/currency (update on every edit)
+
+# Optional — populate when applicable
+counter_evidence: []                                            # Sources that contradict this claim (if disputed)
+superseded_by:                                                  # claim-{uuid} of newer claim replacing this one (if outdated)
+
+# Entity/technology/industry links
+entities: [entity-apple, entity-tsmc]
+technologies: [technology-3nm, technology-arm-architecture]
+industries: [industry-semiconductor]
+
+# Optional
+tags: [claim, performance, apple, chip]                         # Freeform tags
+
+# Body sections required:
+# # Evidence
+# ## Supporting (with source and page/line references)
+# ## Contradicting (if any)
+# ## Context (methodology, sample size, conflicts of interest)
+# ## Related Claims
+
+# ── YAML Safety Rules (MANDATORY — invalid YAML breaks all tooling) ──
+#
+# Rule 1 — COLON-SPACE: Any value containing `: ` (colon + space) MUST be quoted.
+#   WRONG: mechanism: Key insight: margins compressed due to pricing pressure.
+#   RIGHT: mechanism: "Key insight: margins compressed due to pricing pressure."
+#
+# Rule 2 — LEADING > or |: List items starting with `>` or `|` MUST be quoted.
+#   YAML interprets `>` as a folded block scalar and `|` as a literal block scalar.
+#   WRONG:   - >$100M/year on $2.7B revenue
+#   RIGHT:   - ">$100M/year on $2.7B revenue"
+#
+# Rule 3 — INTERNAL QUOTES + TRAILING TEXT: When a value contains quoted substrings with
+#   text after the closing quote, wrap the ENTIRE value in single quotes. YAML stops
+#   parsing at the first closing `"` — trailing text becomes a syntax error.
+#   WRONG:   - "Selective inorganic growth" as pillar 4 vs. EUR 260M
+#   RIGHT:   - '"Selective inorganic growth" as pillar 4 vs. EUR 260M'
+#
+# Rule 4 — NO NESTED LISTS: A list item cannot directly contain a sublist.
+#   WRONG:   - "[[src-name]]"
+#              - "sub-item 1"
+#              - "sub-item 2"
+#   RIGHT:   - source: "[[src-name]]"
+#              passages:
+#                - "sub-item 1"
+#                - "sub-item 2"
+#
+# Rule 5 — YAML RESERVED WORDS: Unquoted `~`, `null`, `NULL`, `true`, `false`, `yes`,
+#   `no`, `on`, `off` (any case) are parsed as booleans/nulls, not strings. Quote them.
+#
+# Rule 6 — VERIFY BEFORE SAVE: Run `python3 -c "import yaml; yaml.safe_load(open('path').read().split('---')[1])"`
+#   on every new or edited wiki page. A YAML parse error means the page is BROKEN.
+
+# Key rules:
+# - Every claim MUST link to at least one source in source_evidence
+# - confidence vs status: confidence = subjective certainty (may change as evidence arrives).
+#   status = evidentiary lifecycle position, moves monotonically:
+#   plausible → confirmed/debunked → superseded
+# - When sources disagree: set status: disputed, populate BOTH source_evidence AND counter_evidence
+# - A claim can have confidence: high + status: plausible, or confidence: low + status: confirmed

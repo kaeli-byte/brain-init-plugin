@@ -1,0 +1,28 @@
+# Process Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/processes/ page
+
+# Required fields
+process_id: process-{uuid}                      # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: EU Medical Device Approval (MDR)          # Process name
+industry: [industry-medical-devices]            # Industries this applies to
+regulations: [regulation-eu-mdr]                # Governing regulations
+standards: [standard-iso-13485]                 # Applicable standards
+companies: [entity-medtronic]                   # Example companies navigating this
+duration_months: 18-36                          # Typical duration range
+success_rate: "XX%"                             # Approval/pass rate
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Optional
+tags: [process, regulatory, medical-device, eu]
+
+# Body sections required:
+# # Process Overview
+# ## Steps & Milestones
+# ## Documentation Requirements
+# ## Timeline & Costs
+# ## Common Failure Modes (MANDATORY — where do others trip up?)
+# ## Best Practices
+# ## Changelog
+
+# Key rule: common failure modes must be documented

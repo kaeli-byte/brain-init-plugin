@@ -1,0 +1,43 @@
+# Source Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/sources/ page
+
+# Required fields
+source_id: src-{uuid}                          # Content-hash-based: first 8 chars of SHA-256 of kebab-title
+raw_path: raw/10k/apple-2025-10k.pdf           # Path to the raw source file
+source_type: 10k-filing                        # One of: 10k-filing | annual-report | patent | industry-report | tech-paper | white-paper | earnings-call | press-release
+publisher: U.S. SEC / Apple Inc.               # Organization that published/released the source
+date_published: YYYY-MM-DD                     # When the source was originally published
+date_ingested: YYYY-MM-DD                      # When we processed it into the wiki
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+reliability: audited                           # One of: audited | peer-reviewed | expert-opinion | industry-consensus | company-claim | speculative | unverified
+materiality: high                              # One of: high | medium | low — how much this source moves the needle
+
+# Linkage (at least one required per category)
+key_claims: [claim-uuid-1, claim-uuid-2]       # Links to extracted claims
+entities_covered: [entity-apple, entity-tsmc]  # Companies, people, etc. covered
+technologies_covered: [technology-3nm]         # Technologies discussed
+industries_covered: [industry-semiconductor]   # Industries relevant
+
+# Optional
+tags: [source, 10k, apple, 2025]               # Freeform tags for discoverability
+
+# Body sections required
+# ## Summary
+# ## Key Takeaways
+# ## Financial Highlights (if applicable)
+# ## Strategic Signals
+# ## Full Text Excerpt
+# ## Changelog
+
+# ── YAML Safety Rules (see claim.yaml for full reference) ──
+# Rule 1 — COLON-SPACE: Quote values containing `: `.
+#   WRONG: filing_jurisdiction: Hong Kong (SEHK: 0425)
+#   RIGHT: filing_jurisdiction: "Hong Kong (SEHK: 0425)"
+# Rule 2 — LEADING > or |: Quote list items starting with `>` or `|`.
+# Rule 3 — INTERNAL QUOTES + TRAILING TEXT: Wrap in single quotes.
+# Rule 4 — NO NESTED LISTS: Use mapping keys between list levels.
+# Rule 5 — YAML RESERVED WORDS: Quote `true`/`false`/`null`/`yes`/`no`/`~` etc.
+# Rule 6 — VERIFY BEFORE SAVE: python3 -c "import yaml; yaml.safe_load(open('path').read().split('---')[1])"
+
+# Key rule: MUST contain a [[company-*]] wikilink in a ## Company section

@@ -1,0 +1,32 @@
+# Application Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/applications/ page
+
+# Required fields
+application_id: application-{uuid}              # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: On-Device LLM Inference for Smartphones   # Application name
+market: [market-ai-inference-edge]              # Related markets
+technologies: [technology-npu, technology-quantization]  # Technologies used
+products: [product-iphone-16]                   # Products implementing this
+companies: [entity-apple, entity-qualcomm]      # Companies active here
+readiness: production                           # One of: production | pilot | concept
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+
+# Linkage
+standards: [standard-onnx]
+regulations: [regulation-eu-ai-act]
+
+# Optional
+tags: [application, llm, edge, smartphone]
+
+# Body sections required:
+# # Application Deep-Dive
+# ## Use Cases
+# ## Technical Requirements
+# ## Performance Benchmarks (MANDATORY — link to specific benchmark claims)
+# ## Competitive Landscape
+# ## Market Opportunity
+# ## Barriers to Adoption
+# ## Changelog
+
+# Key rule: performance benchmarks must be linked to specific claims with numbers

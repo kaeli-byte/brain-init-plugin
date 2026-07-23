@@ -1,0 +1,46 @@
+# Analysis Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/analyses/ page
+
+# Required fields
+analysis_id: analysis-{uuid}                    # Content-hash-based: first 8 chars of SHA-256 of kebab-topic+date
+type: due-diligence                             # One of: due-diligence | competitive-analysis | technology-assessment | investment-memo | scenario-planning | investigation
+scope: [entity-apple, entity-qualcomm]          # Entities/domains covered
+key_claims_tested: [claim-apple-m4-efficiency]  # Claims this analysis examines
+conclusion: "..."                               # Summary conclusion
+confidence: high                                # One of: high | medium | low
+date_completed: 2026-07-17                      # When the analysis was finalized
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+analyst: agent-{session-id} + human-review      # Who produced it
+
+# Optional
+tags: [analysis, due-diligence, semiconductor]
+
+# Body sections required (all types):
+# # Executive Summary
+# ## Methodology
+# ## Key Findings
+# ## Evidence Matrix (MANDATORY — every finding traceable to source evidence)
+# ## Risks & Uncertainties
+# ## Recommendations
+# ## Appendices
+# ## Changelog
+
+# Additional body sections for type: investigation:
+# ## Decision question
+# ## Scope and definitions
+# ## Current thesis
+# ## Supporting evidence
+# ## Counterevidence
+# ## Alternative explanations
+# ## Unknowns
+# ## Invalidation conditions
+# ## Implications
+# ### Executive
+# ### Business development
+# ### Product development
+# ### Industrialization
+# ## Change history
+
+# Key rule: evidence matrix is mandatory. For investigations, the
+#   Implications section MUST be broken down per decision type.

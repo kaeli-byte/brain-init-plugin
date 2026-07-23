@@ -1,0 +1,33 @@
+# Log Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating the initial wiki/log.md or validating it during lint
+#
+# The log.md is the append-only chronological record of all operations.
+
+# Required format (one entry per line):
+# ## [YYYY-MM-DD] {operation-type} | {description} | {page-reference}
+
+# Operation types:
+#   init          — schema created, vault initialized
+#   ingest        — source processed into wiki
+#   query         — question answered and filed
+#   lint          — health check run
+#   reconcile     — cross-source reconciliation
+#   synthesize    — cross-source synthesis written
+#   investigate   — deep investigation completed
+#   decide        — decision document produced
+#   session-end   — session closed (auto-appended by Stop hook)
+
+# Examples:
+# ## [2026-07-17] init | Schema v1.0 created | agent-setup
+# ## [2026-07-17] ingest | Apple 2025 10-K | src-apple-2025-10k
+# ## [2026-07-17] query | "M4 vs Snapdragon X NPU comparison" | query-m4-snapdragon-2026-07-17
+# ## [2026-07-17] lint | Weekly health check | 3 orphans found, 1 contradiction flagged
+
+# Key rules:
+#   - APPEND-ONLY. Never delete or modify existing log entries.
+#   - For long-running operations (ingest): write a WIP marker at start,
+#     then replace with completed summary when done.
+#   - Every operation that modifies wiki state gets an entry.
+#   - Recovery: if an ingest fails mid-way, check log.md for WIP entries
+#     and re-run from step 1 of the ingest workflow.

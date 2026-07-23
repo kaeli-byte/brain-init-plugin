@@ -1,0 +1,38 @@
+# Technology Page Schema
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/technologies/ page
+
+# Required fields
+tech_id: tech-{uuid}                            # Content-hash-based: first 8 chars of SHA-256 of kebab-name
+name: 3nm Semiconductor Process                 # Common name
+maturity: commercial                            # One of: research | development | pilot | commercial | mature | declining
+readiness_level: 9                              # NASA TRL scale 1-9
+last_reviewed: YYYY-MM-DD                      # Date last reviewed for quality/currency (update on every edit)
+key_companies: [entity-tsmc, entity-samsung, entity-intel]
+
+# Linkage
+also_known_as: [N3, TSMC N3]                    # Alternative names
+key_patents: [patent-family-tsmc-n3]
+standards: [standard-ieee-xyz]
+regulations: [regulation-export-controls-semiconductor]
+applications: [application-smartphone-chips]
+performance_claims: [claim-3nm-15-percent-better-ppw]
+market_projections: [market-semiconductor-3nm-2030]
+
+# Optional
+tags: [technology, semiconductor, manufacturing]
+
+# Body sections required:
+# # Technology Deep-Dive
+# ## How It Works
+# ## Key Innovations
+# ## Performance Characteristics
+# ## Manufacturing Challenges
+# ## Competitive Landscape
+# ## Roadmap & Future Generations
+# ## Regulatory & Export Control Implications
+# ## Related Technologies
+# ## Changelog
+
+# Key rule: distinguish from concepts/ (abstract ideas) and products/ (marketable artifacts).
+#   If it has performance numbers and implementation detail, it belongs here.
