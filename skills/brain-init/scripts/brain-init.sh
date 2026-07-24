@@ -511,6 +511,9 @@ cat > "$VAULT_PATH/.claudeignore" << 'CLAUDEIGNORE'
 # Raw source materials — enormous, read only during explicit /capture
 raw/
 
+# IDE planning history — not agent-operational
+.idea/plans/
+
 # Obsidian workspace config — not needed by agent
 .obsidian/
 
