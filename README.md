@@ -133,7 +133,7 @@ All are WARN-level — none block vault initialization.
 1. **Open in Obsidian** — Obsidian auto-downloads dataview, templater, and obsidian-git on first open.
 2. **Set tokens** — edit `.env` with real API keys
 3. **Run `/second-brain:capture`** on your first source
-4. **Run `/lint`** to establish baseline health
+4. **Run `/second-brain:lint`** to establish baseline health
 5. **Commit** — the initial commit is done for you if git is enabled
 
 ## Supporting Skills (All Bundled)
