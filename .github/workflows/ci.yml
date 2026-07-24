@@ -18,7 +18,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python deps
-        run: pip install pyyaml
+        run: pip install pyyaml requests
 
       - name: Shell syntax check (bash -n)
         run: |
@@ -131,7 +131,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python deps
-        run: pip install pyyaml
+        run: pip install pyyaml requests
 
       - name: Smoke test -- scaffold and validate
         run: |
