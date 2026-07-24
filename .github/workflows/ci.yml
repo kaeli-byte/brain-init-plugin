@@ -48,19 +48,19 @@ jobs:
         run: |
           python3 -c '
           import json
-          h = json.load(open("assets/hooks.json"))
+          h = json.load(open("skills/brain-init/assets/hooks.json"))
           n = len(h.get("hooks", []))
           print(f"hooks.json OK ({n} hooks)")
           '
 
       - name: Validate settings.json
-        run: python3 -c 'import json; json.load(open("assets/settings.json")); print("settings.json OK")'
+        run: python3 -c 'import json; json.load(open("skills/brain-init/assets/settings.json")); print("settings.json OK")'
 
       - name: Validate all YAML schemas
         run: |
           python3 << 'PYEOF'
           import yaml, os, sys
-          schema_dir = 'assets/schemas'
+          schema_dir = 'skills/brain-init/assets/schemas'
           total = 0
           failed = 0
           for f in sorted(os.listdir(schema_dir)):
@@ -82,7 +82,7 @@ jobs:
 
       - name: Check no hardcoded legacy paths in hooks.json
         run: |
-          if grep -qF '~/deep-tech-wiki' assets/hooks.json; then
+          if grep -qF '~/deep-tech-wiki' skills/brain-init/assets/hooks.json; then
             echo "FAIL: hooks.json contains hardcoded ~/deep-tech-wiki"
             exit 1
           fi
@@ -110,13 +110,13 @@ jobs:
       - name: Asset inventory (reporting only)
         run: |
           echo "=== Asset inventory ==="
-          echo "YAML schemas:  $(find assets/schemas -name '*.yaml' | wc -l | tr -d ' ')"
+          echo "YAML schemas:  $(find skills/brain-init/assets/schemas -name '*.yaml' | wc -l | tr -d ' ')"
           echo "Domain tmpl:   $(find skills/brain-init/templates -name '*.md' | wc -l | tr -d ' ')"
-          echo "Agents:        $(find assets/agents -name '*.md' | wc -l | tr -d ' ')"
-          echo "Config:        $(find assets/config -name '*.md' | wc -l | tr -d ' ')"
-          echo "Bases:         $(find assets/bases -name '*.base' | wc -l | tr -d ' ')"
-          echo "Obsidian:      $(find assets/obsidian -type f | wc -l | tr -d ' ')"
-          echo "Skill bundles: $(find bundles -name 'SKILL.md' | wc -l | tr -d ' ')"
+          echo "Agents:        $(find skills/brain-init/assets/agents -name '*.md' | wc -l | tr -d ' ')"
+          echo "Config:        $(find skills/brain-init/assets/config -name '*.md' | wc -l | tr -d ' ')"
+          echo "Bases:         $(find skills/brain-init/assets/bases -name '*.base' | wc -l | tr -d ' ')"
+          echo "Obsidian:      $(find skills/brain-init/assets/obsidian -type f | wc -l | tr -d ' ')"
+          echo "Skill bundles: $(find skills/brain-init/bundles -name 'SKILL.md' | wc -l | tr -d ' ')"
           echo "Shell scripts: $(find . -name '*.sh' -not -path './.git/*' | wc -l | tr -d ' ')"
 
   bundle-check:

@@ -153,7 +153,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
             exit 1
         fi
         TEMPLATE_SOURCE="$TEMPLATE_PATH"; TEMPLATE_IS_PLUGIN=false
-    elif [ -n "$_early_plugin_root" ] && [ -d "$_early_plugin_root/assets/schemas" ]; then
+    elif [ -n "$_early_plugin_root" ] && [ -d "$_early_plugin_root/skills/brain-init/assets/schemas" ]; then
         TEMPLATE_SOURCE="$_early_plugin_root"; TEMPLATE_IS_PLUGIN=true
     elif [ -d "$HOME/deep-tech-wiki/templates/schemas" ]; then
         TEMPLATE_SOURCE="$HOME/deep-tech-wiki"; TEMPLATE_IS_PLUGIN=false
@@ -165,14 +165,14 @@ if [ "$UPGRADE_HARNESS" = true ]; then
 
     # Set asset paths (same logic as Phase 0)
     if [ "$TEMPLATE_IS_PLUGIN" = true ]; then
-        SCHEMAS_SRC="$_early_plugin_root/assets/schemas"
-        HOOKS_SRC="$_early_plugin_root/assets/hooks.json"
-        SETTINGS_SRC="$_early_plugin_root/assets/settings.json"
-        AGENTS_SRC="$_early_plugin_root/assets/agents"
-        CONFIG_SRC="$_early_plugin_root/assets/config"
-        BASES_SRC="$_early_plugin_root/assets/bases"
-        OBSIDIAN_SRC="$_early_plugin_root/assets/obsidian"
-        BUNDLES_SRC="$_early_plugin_root/bundles"
+        SCHEMAS_SRC="$_early_plugin_root/skills/brain-init/assets/schemas"
+        HOOKS_SRC="$_early_plugin_root/skills/brain-init/assets/hooks.json"
+        SETTINGS_SRC="$_early_plugin_root/skills/brain-init/assets/settings.json"
+        AGENTS_SRC="$_early_plugin_root/skills/brain-init/assets/agents"
+        CONFIG_SRC="$_early_plugin_root/skills/brain-init/assets/config"
+        BASES_SRC="$_early_plugin_root/skills/brain-init/assets/bases"
+        OBSIDIAN_SRC="$_early_plugin_root/skills/brain-init/assets/obsidian"
+        BUNDLES_SRC="$_early_plugin_root/skills/brain-init/bundles"
         DOMAIN_TEMPLATES_SRC="$_early_plugin_root/skills/brain-init/templates"
         echo "  Template source: $_early_plugin_root (brain-init plugin)"
     else
@@ -362,7 +362,7 @@ if [ -n "$TEMPLATE_PATH" ]; then
 else
     # Try plugin root first
     PLUGIN_ROOT="$(find_plugin_root 2>/dev/null || echo '')"
-    if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/assets/schemas" ]; then
+    if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/brain-init/assets/schemas" ]; then
         TEMPLATE_SOURCE="$PLUGIN_ROOT"
         TEMPLATE_IS_PLUGIN=true
         echo "  Template source: $TEMPLATE_SOURCE (brain-init plugin v1.0.0)"
@@ -386,14 +386,14 @@ fi
 
 # For plugin mode: define asset paths
 if [ "$TEMPLATE_IS_PLUGIN" = true ]; then
-    SCHEMAS_SRC="$PLUGIN_ROOT/assets/schemas"
-    HOOKS_SRC="$PLUGIN_ROOT/assets/hooks.json"
-    SETTINGS_SRC="$PLUGIN_ROOT/assets/settings.json"
-    AGENTS_SRC="$PLUGIN_ROOT/assets/agents"
-    CONFIG_SRC="$PLUGIN_ROOT/assets/config"
-    BASES_SRC="$PLUGIN_ROOT/assets/bases"
-    OBSIDIAN_SRC="$PLUGIN_ROOT/assets/obsidian"
-    BUNDLES_SRC="$PLUGIN_ROOT/bundles"
+    SCHEMAS_SRC="$PLUGIN_ROOT/skills/brain-init/assets/schemas"
+    HOOKS_SRC="$PLUGIN_ROOT/skills/brain-init/assets/hooks.json"
+    SETTINGS_SRC="$PLUGIN_ROOT/skills/brain-init/assets/settings.json"
+    AGENTS_SRC="$PLUGIN_ROOT/skills/brain-init/assets/agents"
+    CONFIG_SRC="$PLUGIN_ROOT/skills/brain-init/assets/config"
+    BASES_SRC="$PLUGIN_ROOT/skills/brain-init/assets/bases"
+    OBSIDIAN_SRC="$PLUGIN_ROOT/skills/brain-init/assets/obsidian"
+    BUNDLES_SRC="$PLUGIN_ROOT/skills/brain-init/bundles"
     DOMAIN_TEMPLATES_SRC="$PLUGIN_ROOT/skills/brain-init/templates"
 else
     # Legacy mode: paths relative to deep-tech-wiki clone

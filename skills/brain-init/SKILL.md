@@ -1,6 +1,6 @@
 ---
 name: brain-init
-version: 1.1.0
+version: 1.1.1
 description: >
   Initialize a new Industrial Intelligence Brain vault. Creates the full harness —
   directory tree, 18 page-type schemas, Obsidian vault config, ECC hooks, agent
@@ -113,7 +113,7 @@ The `brain-init.sh` script executes 8 phases from the plugin's bundled assets:
 - **Phase 3** — Schemas: 18 YAML schemas, 3 config docs, 3 Base views
 - **Phase 4** — Obsidian: 6 JSON configs, community plugins declared (auto-download on first open)
 - **Phase 5** — Domain: CLAUDE.md + purpose.md from preset template with variable substitution
-- **Phase 6** — Skills: 4 supporting skills copied from `bundles/` into vault's `.claude/skills/`
+- **Phase 6** — Skills: 4 supporting skills copied from `skills/brain-init/bundles/` into vault's `.claude/skills/`
 - **Phase 7** — Post-init: git init, qmd collections, indexing
 - **Phase 8** — Validation: 12 inline checks
 
@@ -133,10 +133,10 @@ The brain-init plugin is self-contained:
 
 ```
 $PLUGIN_ROOT/
-├── assets/          # Copy-to-vault: schemas, hooks.json, settings.json, agents, obsidian, config, bases
-├── bundles/         # Supporting skills copied into vault .claude/skills/
 └── skills/brain-init/
     ├── SKILL.md     # This file
+    ├── assets/      # Copy-to-vault: schemas, hooks.json, settings.json, agents, obsidian, config, bases
+    ├── bundles/     # Supporting skills copied into vault .claude/skills/
     ├── scripts/     # brain-init.sh, validate-vault.sh
     └── templates/   # Domain-adapted CLAUDE.md + purpose.md (5 variants each)
 ```
