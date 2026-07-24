@@ -255,6 +255,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
 
     # Update types.json
     if [ -f "$OBSIDIAN_SRC/types.json" ]; then
+            mkdir -p "$VAULT_PATH/.obsidian"
         cp "$OBSIDIAN_SRC/types.json" "$VAULT_PATH/.obsidian/types.json"
         echo "  Obsidian types.json: updated"; UPGRADED=$((UPGRADED + 1))
     fi
@@ -531,7 +532,9 @@ cat > "$VAULT_PATH/.env.example" << 'ENVEXAMPLE'
 # Required for PDFs >20 pages or >10 MB (annual reports, 10-Ks, etc.)
 MINERU_TOKEN=
 
-# Add other API tokens below as needed
+# Kimi agent-gw — SEC EDGAR data source access
+KIMI_API_KEY=sk-kimi-...
+KIMI_BASE_URL=https://agent-gw.kimi.com/coding
 ENVEXAMPLE
 
 touch "$VAULT_PATH/.qmd-last-refresh"

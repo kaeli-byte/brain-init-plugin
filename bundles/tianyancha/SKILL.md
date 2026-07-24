@@ -45,7 +45,7 @@ python3 $S call --api-name "tianyancha_api_search" \
 
 # Step 2 — Call the discovered API with full company name
 python3 $S call --api-name "tianyancha_api_call" \
-  --params-json '{"api_call_name":"工商信息-企业基本信息","api_call_params":{"keyword":"比亚迪股份有限公司"},"file_path":"/Users/hafid/deep-tech-wiki/raw/tianyancha/BYD-basic-info.csv"}'
+  --params-json '{"api_call_name":"工商信息-企业基本信息","api_call_params":{"keyword":"比亚迪股份有限公司"},"file_path":"<vault>/raw/tianyancha/BYD-basic-info.csv"}'
 ```
 
 ## Key rules
@@ -94,7 +94,7 @@ Search with these keywords to discover relevant APIs:
 
 ```bash
 S=.claude/skills/tianyancha/scripts/tianyancha_tool.py
-OUT=/Users/hafid/deep-tech-wiki/raw/tianyancha
+OUT=<vault>/raw/tianyancha
 
 # --- Search for a company (when you don't know the full name) ---
 python3 $S call --api-name "tianyancha_company_search" \
@@ -126,7 +126,7 @@ A-share filings from `cfi-filings`:
 ```bash
 # 1. Get basic company info
 python3 $S call --api-name "tianyancha_api_call" \
-  --params-json '{"api_call_name":"工商信息-企业基本信息","api_call_params":{"keyword":"<full company name>"},"file_path":"/Users/hafid/deep-tech-wiki/raw/tianyancha/company-basic-info.csv"}'
+  --params-json '{"api_call_name":"工商信息-企业基本信息","api_call_params":{"keyword":"<full company name>"},"file_path":"<vault>/raw/tianyancha/company-basic-info.csv"}'
 
 # 2. Read the CSV and extract claims via /capture
 # Registration date, legal representative, registered capital, status

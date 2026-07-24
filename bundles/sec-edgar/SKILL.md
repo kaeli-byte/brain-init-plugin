@@ -40,7 +40,7 @@ S=.claude/skills/sec-edgar/scripts/sec_edgar_tool.py
 
 2. **Every API requires `file_path`** — an absolute path where the CSV output
    will be saved. Always use paths under `raw/sec-edgar/` in the workspace
-   (e.g. `/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-info.csv`). The
+   (e.g. `<vault>/raw/sec-edgar/AAPL-info.csv`). The
    script writes the returned file to exactly this path.
 
 ## Workflow
@@ -65,7 +65,7 @@ exchange, shares outstanding, public float, category, contact info.
 
 ```bash
 python3 $S call --api-name "sec_edgar_get_company_info" \
-  --params-json '{"ticker":"AAPL","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-company-info.csv"}'
+  --params-json '{"ticker":"AAPL","file_path":"<vault>/raw/sec-edgar/AAPL-company-info.csv"}'
 ```
 
 ### `sec_edgar_get_filings`
@@ -76,11 +76,11 @@ labels (e.g. `fiscal_year=2024, fiscal_period=Q2`) before calling
 ```bash
 # All recent filings
 python3 $S call --api-name "sec_edgar_get_filings" \
-  --params-json '{"ticker":"AAPL","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-filings.csv"}'
+  --params-json '{"ticker":"AAPL","file_path":"<vault>/raw/sec-edgar/AAPL-filings.csv"}'
 
 # Filter by form type
 python3 $S call --api-name "sec_edgar_get_filings" \
-  --params-json '{"ticker":"TSLA","form_type":"10-K","limit":10,"file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/TSLA-10K-filings.csv"}'
+  --params-json '{"ticker":"TSLA","form_type":"10-K","limit":10,"file_path":"<vault>/raw/sec-edgar/TSLA-10K-filings.csv"}'
 ```
 
 ### `sec_edgar_get_financial_statements`
@@ -95,15 +95,15 @@ View levels: `summary` (~15 rows), `standard` (default, ~25 rows), `detailed`
 ```bash
 # Latest annual (all 3 statements)
 python3 $S call --api-name "sec_edgar_get_financial_statements" \
-  --params-json '{"ticker":"AAPL","statement":"all","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-financials.csv"}'
+  --params-json '{"ticker":"AAPL","statement":"all","file_path":"<vault>/raw/sec-edgar/AAPL-financials.csv"}'
 
 # Specific fiscal year, income statement only, detailed view
 python3 $S call --api-name "sec_edgar_get_financial_statements" \
-  --params-json '{"ticker":"AAPL","statement":"income_statement","financial_parameter":"FY2025","view":"detailed","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-FY2025-income.csv"}'
+  --params-json '{"ticker":"AAPL","statement":"income_statement","financial_parameter":"FY2025","view":"detailed","file_path":"<vault>/raw/sec-edgar/AAPL-FY2025-income.csv"}'
 
 # Quarterly (Q2 FY2026)
 python3 $S call --api-name "sec_edgar_get_financial_statements" \
-  --params-json '{"ticker":"AAPL","statement":"balance_sheet","financial_parameter":"Q2FY2026","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-Q2FY2026-bs.csv"}'
+  --params-json '{"ticker":"AAPL","statement":"balance_sheet","financial_parameter":"Q2FY2026","file_path":"<vault>/raw/sec-edgar/AAPL-Q2FY2026-bs.csv"}'
 ```
 
 ### `sec_edgar_get_xbrl_facts`
@@ -116,15 +116,15 @@ revenue/net income/etc. across years. Three mutually exclusive query modes:
 ```bash
 # Revenue trend 2019-2025 via keyword
 python3 $S call --api-name "sec_edgar_get_xbrl_facts" \
-  --params-json '{"ticker":"AAPL","keyword":"revenue","year":"2019-2025","period":"FY","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-revenue-trend.csv"}'
+  --params-json '{"ticker":"AAPL","keyword":"revenue","year":"2019-2025","period":"FY","file_path":"<vault>/raw/sec-edgar/AAPL-revenue-trend.csv"}'
 
 # Quick latest metric
 python3 $S call --api-name "sec_edgar_get_xbrl_facts" \
-  --params-json '{"ticker":"AAPL","metric":"free_cash_flow","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-fcf.csv"}'
+  --params-json '{"ticker":"AAPL","metric":"free_cash_flow","file_path":"<vault>/raw/sec-edgar/AAPL-fcf.csv"}'
 
 # Exact XBRL concept
 python3 $S call --api-name "sec_edgar_get_xbrl_facts" \
-  --params-json '{"ticker":"MSFT","concept":"NetIncomeLoss","period":"FY","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/MSFT-net-income.csv"}'
+  --params-json '{"ticker":"MSFT","concept":"NetIncomeLoss","period":"FY","file_path":"<vault>/raw/sec-edgar/MSFT-net-income.csv"}'
 ```
 
 ### `sec_edgar_get_insider_trades`
@@ -133,7 +133,7 @@ per filing; `summary=false` = full transaction detail.
 
 ```bash
 python3 $S call --api-name "sec_edgar_get_insider_trades" \
-  --params-json '{"ticker":"META","limit":20,"file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/META-insider-trades.csv"}'
+  --params-json '{"ticker":"META","limit":20,"file_path":"<vault>/raw/sec-edgar/META-insider-trades.csv"}'
 ```
 
 ### `sec_edgar_get_institutional_holdings`
@@ -143,7 +143,7 @@ quarter-over-quarter position changes.
 
 ```bash
 python3 $S call --api-name "sec_edgar_get_institutional_holdings" \
-  --params-json '{"ticker":"BRK-B","compare":true,"file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/BRKB-13F.csv"}'
+  --params-json '{"ticker":"BRK-B","compare":true,"file_path":"<vault>/raw/sec-edgar/BRKB-13F.csv"}'
 ```
 
 ### `sec_edgar_get_company_events`
@@ -152,7 +152,7 @@ executive changes. Use `start_date`/`end_date` to filter.
 
 ```bash
 python3 $S call --api-name "sec_edgar_get_company_events" \
-  --params-json '{"ticker":"AMZN","start_date":"2025-01-01","limit":20,"file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AMZN-events.csv"}'
+  --params-json '{"ticker":"AMZN","start_date":"2025-01-01","limit":20,"file_path":"<vault>/raw/sec-edgar/AMZN-events.csv"}'
 ```
 
 ## Integration with wiki ingestion
@@ -162,10 +162,10 @@ SEC EDGAR CSV data feeds the wiki's `/capture` pipeline:
 ```bash
 # 1. Pull company info + financials
 python3 $S call --api-name "sec_edgar_get_company_info" \
-  --params-json '{"ticker":"AAPL","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-info.csv"}'
+  --params-json '{"ticker":"AAPL","file_path":"<vault>/raw/sec-edgar/AAPL-info.csv"}'
 
 python3 $S call --api-name "sec_edgar_get_financial_statements" \
-  --params-json '{"ticker":"AAPL","statement":"all","file_path":"/Users/hafid/deep-tech-wiki/raw/sec-edgar/AAPL-financials.csv"}'
+  --params-json '{"ticker":"AAPL","statement":"all","file_path":"<vault>/raw/sec-edgar/AAPL-financials.csv"}'
 
 # 2. Read the CSV and extract claims via /capture
 # The CSV contains structured numbers — use these to create/update
