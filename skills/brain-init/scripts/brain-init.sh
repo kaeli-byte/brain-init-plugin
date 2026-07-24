@@ -1213,9 +1213,11 @@ check "hooks.json: no hardcoded ~/deep-tech-wiki" \
 AGENT_COUNT=$(ls "$VAULT_PATH/.claude/agents"/*.md 2>/dev/null | wc -l | tr -d ' ')
 check "3 agent definitions present" '[ "$AGENT_COUNT" -eq 3 ]'
 
-# Skills
-check "second-brain SKILL.md present" \
-  '[ -f "$VAULT_PATH/.claude/skills/second-brain/SKILL.md" ]'
+# Skills (7 scoped second-brain skills)
+for skill_name in capture query lint reconcile investigate synthesize status; do
+  check "second-brain/$skill_name SKILL.md present" \
+    "[ -f \"$VAULT_PATH/.claude/skills/second-brain/$skill_name/SKILL.md\" ]"
+done
 
 # CLAUDE.md
 check "CLAUDE.md present" '[ -f "$VAULT_PATH/CLAUDE.md" ]'

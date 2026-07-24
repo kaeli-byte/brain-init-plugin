@@ -35,7 +35,9 @@ document with explicit unknowns and invalidation conditions.
 - **Analyst**: `Agent(subagent_type: "analyst")` — Step 4. Tests the thesis against evidence.
   Returns confidence-calibrated findings, counterevidence, alternative explanations.
 
-## Decision Documents (/decide)
+## Decision Documents (/second-brain:investigate — decision sub-workflow)
+
+> `/decide` is a sub-workflow of investigate, invoked via the same skill with a decision flag or as a follow-up. Use `/second-brain:investigate` with the decision flag.
 
 Convert an approved investigation into audience-specific decision documents. **Run only after human review approves the investigation.**
 
