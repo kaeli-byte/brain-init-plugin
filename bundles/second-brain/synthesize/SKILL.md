@@ -3,6 +3,7 @@ name: synthesize
 description: >
   Generate cross-source syntheses on topics or weekly intelligence digests. Identifies patterns,
   contradictions, gaps, and produces strategic assessments across multiple sources.
+version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 

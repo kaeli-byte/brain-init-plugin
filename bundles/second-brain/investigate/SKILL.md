@@ -5,6 +5,7 @@ description: >
   the thesis. Produces a decision-ready document with thesis, counterevidence, unknowns, and
   invalidation conditions. Includes /decide for converting approved investigations to
   audience-specific decision documents.
+version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: cfi-filings
+version: 1.0.0
 description: Query and download Chinese A-share periodic filings (年报/半年报/季报 annual, semi-annual, Q1/Q3 reports) by stock code and year, and find stock codes from Chinese company names, through the local CFI Periodic Filings API (中财网 + 巨潮资讯/cninfo dual-source, full history back to IPO, covers 沪/深/创业板/科创板/北交所). Use when the user asks for a listed Chinese company's annual report, quarterly/semi-annual report, filing PDFs, disclosure dates, code lookup, or batch filing collection — e.g. "茅台2020年年报", "download the FY2023 annual report PDF for 688005", "what is 宁德时代's stock code", "when did X publish its Q3 report", "collect annual reports for these companies".
 ---
 

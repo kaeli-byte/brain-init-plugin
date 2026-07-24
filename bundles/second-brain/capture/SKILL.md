@@ -3,6 +3,7 @@ name: capture
 description: >
   Ingest a source (10-K, patent, report, paper) into the wiki. Extracts claims, writes source summary,
   updates entities, and ensures bidirectional source-company wikilinks.
+version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 

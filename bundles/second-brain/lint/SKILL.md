@@ -1,6 +1,7 @@
 ---
 name: lint
 description: Health-check the entire wiki — orphans, contradictions, stale pages, missing cross-references, index freshness, and source drift.
+version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 

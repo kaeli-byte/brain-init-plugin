@@ -4,7 +4,7 @@ description: "Batch-convert PDFs to Markdown using MinerU Precision Parse API. U
 homepage: https://mineru.net/apiManage/docs
 metadata:
   author: deep-tech-wiki
-  version: "1.0.0"
+  version: "1.0.1"
   argument-hint: "<pdf-file-or-dir>"
   requires:
     bins: ["curl", "python3"]

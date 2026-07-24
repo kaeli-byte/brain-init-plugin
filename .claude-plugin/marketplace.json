@@ -1,13 +1,19 @@
 {
   "name": "brain-init",
-  "owner": { "name": "Kaeli Byte" },
-  "plugins": [{
-    "name": "brain-init",
-    "source": "./",
-    "version": "1.0.0",
-    "description": "Initialize Industrial Intelligence Brain vaults — schemas, hooks, agents, Obsidian config, qmd collections, and domain-adapted config. Self-contained: no external template repo required.",
-    "author": { "name": "Kaeli Byte" },
-    "category": "knowledge-management",
-    "strict": false
-  }]
+  "owner": {
+    "name": "Kaeli Byte"
+  },
+  "plugins": [
+    {
+      "name": "brain-init",
+      "source": "./",
+      "version": "1.1.0",
+      "description": "Initialize Industrial Intelligence Brain vaults \u2014 schemas, hooks, agents, Obsidian config, qmd collections, and domain-adapted config. Self-contained: no external template repo required.",
+      "author": {
+        "name": "Kaeli Byte"
+      },
+      "category": "knowledge-management",
+      "strict": false
+    }
+  ]
 }

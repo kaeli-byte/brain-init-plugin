@@ -1,5 +1,6 @@
 ---
 name: tianyancha
+version: 1.0.1
 description: Query Tianyancha (天眼查) Chinese enterprise database — 226 APIs covering company registration, shareholders, legal risks, intellectual property, financials, investments, group structures, and more. Use when researching Chinese companies (due diligence, competitor analysis, supply chain mapping, finding company registration details). Complements cfi-filings (A-share filings) and sec-edgar (US SEC) for full-spectrum company intelligence.
 ---
 

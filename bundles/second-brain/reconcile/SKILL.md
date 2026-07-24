@@ -4,6 +4,7 @@ description: >
   Reconcile a newly ingested source against existing wiki knowledge. Classifies every candidate
   claim into one of six dispositions — new, corroborating, updating, contradicting, superseding,
   or irrelevant. This is the compounding step.
+version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 

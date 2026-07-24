@@ -1,5 +1,6 @@
 ---
 name: sec-edgar
+version: 1.0.1
 description: Query US public company SEC EDGAR filings and financial data — company info, filings (10-K, 10-Q, 8-K), XBRL facts, financial statements, insider trades, institutional holdings, and material events — through the Kimi agent-gw data source API. Use when the user needs SEC filing data, financial statements for US-listed companies, insider trading reports, institutional ownership, or wants to pull structured EDGAR data into wiki ingestion. Complements cfi-filings (Chinese A-shares) to cover US equities.
 ---
 
