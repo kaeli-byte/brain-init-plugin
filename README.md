@@ -132,7 +132,7 @@ All are WARN-level — none block vault initialization.
 
 1. **Open in Obsidian** — Obsidian auto-downloads dataview, templater, and obsidian-git on first open.
 2. **Set tokens** — edit `.env` with real API keys
-3. **Run `/capture`** on your first source
+3. **Run `/second-brain:capture`** on your first source
 4. **Run `/lint`** to establish baseline health
 5. **Commit** — the initial commit is done for you if git is enabled
 
@@ -140,7 +140,7 @@ All are WARN-level — none block vault initialization.
 
 | Skill | Coverage |
 |---|---|
-| `second-brain` | Wiki operations — /capture, /query, /lint, /synthesize, /investigate |
+| `second-brain` | Wiki operations — /second-brain:capture, /second-brain:query, /second-brain:lint, /second-brain:synthesize, /second-brain:investigate, /second-brain:reconcile, /second-brain:status |
 | `mineru-batch` | PDF → Markdown conversion (all languages) |
 | `cfi-filings` | Chinese A-share periodic filings |
 | `sec-edgar` | US SEC EDGAR — company info, financials, XBRL |

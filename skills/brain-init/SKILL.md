@@ -109,7 +109,7 @@ The `brain-init.sh` script executes 8 phases from the plugin's bundled assets:
 
 - **Phase 0** — Preflight: dependency check, template resolution (plugin → legacy fallback → error)
 - **Phase 1** — Scaffold: directory tree, .gitignore, .claudeignore, .env.example, wiki stubs
-- **Phase 2** — Harness: hooks.json, settings.json, 3 agent definitions, second-brain skill
+- **Phase 2** — Harness: hooks.json, settings.json, 3 agent definitions, 7 scoped second-brain skills
 - **Phase 3** — Schemas: 18 YAML schemas, 3 config docs, 3 Base views
 - **Phase 4** — Obsidian: 6 JSON configs, community plugins declared (auto-download on first open)
 - **Phase 5** — Domain: CLAUDE.md + purpose.md from preset template with variable substitution
