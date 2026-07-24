@@ -119,9 +119,74 @@ jobs:
           echo "Skill bundles: $(find bundles -name 'SKILL.md' | wc -l | tr -d ' ')"
           echo "Shell scripts: $(find . -name '*.sh' -not -path './.git/*' | wc -l | tr -d ' ')"
 
+  bundle-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install pyyaml
+
+      - name: Python syntax check (all .py files)
+        run: |
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            echo "Checking $f"
+            python3 -m py_compile "$f" || FAILED=$((FAILED + 1))
+          done < <(find . -name '*.py' -not -path './.git/*' -print0)
+          if [ "$FAILED" -gt 0 ]; then
+            echo "FAIL: $FAILED Python file(s) have syntax errors"
+            exit 1
+          fi
+          echo "OK: all Python files pass syntax check"
+
+      - name: Validate SKILL.md frontmatter (all bundles)
+        run: |
+          python3 << 'PYEOF'
+          import yaml, os, sys
+          failed = 0
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f != 'SKILL.md':
+                      continue
+                  path = os.path.join(root, f)
+                  content = open(path).read()
+                  if not content.startswith('---'):
+                      print(f'  FAIL {path}: no YAML frontmatter (missing --- delimiters)')
+                      failed += 1
+                      continue
+                  parts = content.split('---', 2)
+                  if len(parts) < 3:
+                      print(f'  FAIL {path}: unclosed frontmatter')
+                      failed += 1
+                      continue
+                  try:
+                      fm = yaml.safe_load(parts[1])
+                      if not isinstance(fm, dict):
+                          print(f'  FAIL {path}: frontmatter is not a mapping')
+                          failed += 1
+                      else:
+                          name = fm.get('name', 'UNNAMED')
+                          print(f'  OK  {path} ({name})')
+                  except Exception as e:
+                      print(f'  FAIL {path}: {e}')
+                      failed += 1
+          if failed:
+              print(f'\n{failed} SKILL.md file(s) have invalid frontmatter')
+              sys.exit(1)
+          print('All SKILL.md files: valid frontmatter')
+          PYEOF
+
   smoke-test:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, bundle-check]
     steps:
       - uses: actions/checkout@v4
 
@@ -133,7 +198,7 @@ jobs:
       - name: Install Python deps
         run: pip install pyyaml requests
 
-      - name: Smoke test -- scaffold and validate
+      - name: Smoke test -- full scaffold (semiconductor) + validate
         run: |
           TMP="$(mktemp -d)"
           export CLAUDE_PLUGIN_ROOT="$PWD"
@@ -142,20 +207,10 @@ jobs:
           bash skills/brain-init/scripts/brain-init.sh \
             "$TMP/test-full" \
             --domain semiconductor \
-            --no-git \
-            --no-qmd \
-            --no-obsidian \
-            --no-supporting-skills
+            --no-git --no-qmd --no-obsidian --no-supporting-skills
           echo ""
 
-          echo "=== Bare scaffold ==="
-          bash skills/brain-init/scripts/brain-init.sh \
-            "$TMP/test-bare" \
-            --bare \
-            --no-git
-          echo ""
-
-          echo "=== Validate the full scaffold ==="
+          echo "=== Validate the scaffold ==="
           bash skills/brain-init/scripts/validate-vault.sh "$TMP/test-full"
           echo ""
 
@@ -163,11 +218,94 @@ jobs:
           if grep -qi 'semiconductor\|chip\|fab' "$TMP/test-full/CLAUDE.md"; then
             echo "OK: CLAUDE.md contains semiconductor domain keywords"
           else
-            echo "WARN: CLAUDE.md may not be domain-adapted"
+            echo "FAIL: CLAUDE.md not domain-adapted"
+            exit 1
+          fi
+          rm -rf "$TMP"
+
+      - name: Smoke test -- all 5 domain presets
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          PRESETS=(industrial-intelligence semiconductor biotech energy materials)
+          FAILED=0
+
+          for preset in "${PRESETS[@]}"; do
+            echo "=== Scaffold: $preset ==="
+            bash skills/brain-init/scripts/brain-init.sh \
+              "$TMP/test-$preset" \
+              --domain "$preset" \
+              --no-git --no-qmd --no-obsidian --no-supporting-skills \
+              2>&1 | tail -2
+            [ -f "$TMP/test-$preset/CLAUDE.md" ] || { echo "  FAIL: CLAUDE.md missing"; FAILED=$((FAILED + 1)); continue; }
+            echo "  OK"
+          done
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "FAIL: $FAILED domain preset(s) failed to scaffold"
+            exit 1
+          fi
+          echo "OK: all 5 presets scaffolded successfully"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- --domain-custom + --name
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-custom" \
+            --domain-custom "Renewable energy supply chains" \
+            --name "My Brain" \
+            --no-git --no-qmd --no-obsidian --no-supporting-skills
+          echo ""
+
+          [ -f "$TMP/test-custom/CLAUDE.md" ] || { echo "FAIL: CLAUDE.md missing"; exit 1; }
+          [ -f "$TMP/test-custom/config/purpose.md" ] || { echo "FAIL: purpose.md missing"; exit 1; }
+
+          # CLAUDE.md should mention the custom domain description (template has {{DOMAIN}} substitution)
+          if grep -qi 'renewable' "$TMP/test-custom/CLAUDE.md"; then
+            echo "OK: custom domain propagated to CLAUDE.md"
+          else
+            echo "WARN: custom domain text not found in CLAUDE.md (template may lack domain keywords)"
           fi
 
-          echo ""
-          echo "=== All smoke tests passed ==="
+          echo "OK: --domain-custom + --name scaffolded successfully"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- bare scaffold
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-bare" \
+            --bare --no-git
+
+          [ -d "$TMP/test-bare/wiki/claims" ] || { echo "FAIL: wiki/claims missing"; exit 1; }
+          [ -f "$TMP/test-bare/.gitignore" ] || { echo "FAIL: .gitignore missing"; exit 1; }
+          [ ! -f "$TMP/test-bare/CLAUDE.md" ] || { echo "FAIL: bare mode should not create CLAUDE.md"; exit 1; }
+
+          echo "OK: bare scaffold verified (no harness files)"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- --force into non-empty dir
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          mkdir -p "$TMP/test-force/existing-file"
+          echo "hello" > "$TMP/test-force/existing-file.txt"
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-force" \
+            --domain materials --force \
+            --no-git --no-qmd --no-obsidian --no-supporting-skills
+
+          [ -f "$TMP/test-force/existing-file.txt" ] || { echo "FAIL: existing file was deleted"; exit 1; }
+          [ -f "$TMP/test-force/CLAUDE.md" ] || { echo "FAIL: CLAUDE.md missing (--force should merge)"; exit 1; }
+
+          echo "OK: --force merged into non-empty directory"
           rm -rf "$TMP"
 
       - name: Smoke test -- upgrade harness
@@ -178,10 +316,7 @@ jobs:
           bash skills/brain-init/scripts/brain-init.sh \
             "$TMP/test-vault" \
             --domain energy \
-            --no-git \
-            --no-qmd \
-            --no-obsidian \
-            --no-supporting-skills
+            --no-git --no-qmd --no-obsidian --no-supporting-skills
 
           bash skills/brain-init/scripts/brain-init.sh \
             --upgrade-harness "$TMP/test-vault"

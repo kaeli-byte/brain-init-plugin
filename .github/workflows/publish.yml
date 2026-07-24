@@ -15,6 +15,16 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install pyyaml
 
       - name: Extract version from tag
         id: version
@@ -23,6 +33,14 @@ jobs:
           VERSION="${TAG#v}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Detect pre-release: tags like v1.0.0-rc1, v1.0.0-beta, v1.0.0-alpha*
+          if echo "$VERSION" | grep -qE '-(alpha|beta|rc|pre)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Pre-release tag detected"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "Tag: $TAG  Version: $VERSION"
 
       - name: Verify plugin.json version matches tag
@@ -46,6 +64,45 @@ jobs:
           fi
           echo "OK: marketplace.json version $MKT_VER matches tag v$TAG_VER"
 
+      - name: Validate all SKILL.md frontmatter
+        run: |
+          python3 << 'PYEOF'
+          import yaml, os, sys
+          failed = 0
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f != 'SKILL.md':
+                      continue
+                  path = os.path.join(root, f)
+                  content = open(path).read()
+                  if not content.startswith('---'):
+                      print(f'  FAIL {path}: no YAML frontmatter')
+                      failed += 1
+                      continue
+                  parts = content.split('---', 2)
+                  if len(parts) < 3:
+                      print(f'  FAIL {path}: unclosed frontmatter')
+                      failed += 1
+                      continue
+                  try:
+                      fm = yaml.safe_load(parts[1])
+                      if not isinstance(fm, dict):
+                          print(f'  FAIL {path}: frontmatter is not a mapping')
+                          failed += 1
+                      else:
+                          name = fm.get('name', 'UNNAMED')
+                          print(f'  OK  {path} ({name})')
+                  except Exception as e:
+                      print(f'  FAIL {path}: {e}')
+                      failed += 1
+          if failed:
+              print(f'\n{failed} SKILL.md file(s) have invalid frontmatter -- refusing to publish')
+              sys.exit(1)
+          print('All SKILL.md frontmatter: valid')
+          PYEOF
+
       - name: Generate changelog from commits since last tag
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
@@ -67,6 +124,7 @@ jobs:
         with:
           name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
             skills/brain-init/SKILL.md
