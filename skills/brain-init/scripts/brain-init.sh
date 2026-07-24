@@ -215,7 +215,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         echo "  Agent definitions: $AGENT_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
     fi
 
-    # Update scoped second-brain skills (7 skills in subdirectories)
+    # Update flat second-brain skills (7 skills in subdirectories)
     SECOND_BRAIN_SRC="$BUNDLES_SRC/second-brain"
     [ "$TEMPLATE_IS_PLUGIN" != true ] && [ -d "$TEMPLATE_SOURCE/.claude/skills/second-brain" ] && \
         SECOND_BRAIN_SRC="$TEMPLATE_SOURCE/.claude/skills/second-brain"
@@ -229,12 +229,18 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         for skill_dir in "$SECOND_BRAIN_SRC"/*/; do
             [ -d "$skill_dir" ] || continue
             skill_name=$(basename "$skill_dir")
+            skill_full_name="second-brain-$skill_name"
             if [ -f "$skill_dir/SKILL.md" ]; then
-                mkdir -p "$VAULT_PATH/.claude/skills/second-brain/$skill_name"
-                cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/second-brain/$skill_name/"
+                # Clean up old nested structure
+                rm -rf "$VAULT_PATH/.claude/skills/second-brain/$skill_name" 2>/dev/null
+                # Deploy to flat path
+                mkdir -p "$VAULT_PATH/.claude/skills/$skill_full_name"
+                cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/$skill_full_name/"
                 SKILL_UPDATED=$((SKILL_UPDATED + 1))
             fi
         done
+        # Clean up old nested second-brain directory if empty
+        rmdir "$VAULT_PATH/.claude/skills/second-brain" 2>/dev/null || true
     fi
     if [ "$SKILL_UPDATED" -gt 0 ]; then
         echo "  second-brain skills: $SKILL_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
@@ -300,7 +306,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
     echo "  Updated: $UPGRADED harness components"
     echo "  Preserved: $PAGE_COUNT wiki pages + raw/ content"
     echo ""
-    echo "  Next: Run /second-brain:lint to verify vault health"
+    echo "  Next: Run /second-brain-lint to verify vault health"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     exit 0
 fi
@@ -487,7 +493,6 @@ if [ "$BARE_MODE" = false ]; then
   mkdir -p "$VAULT_PATH/config"
   mkdir -p "$VAULT_PATH/.claude/agents"
   mkdir -p "$VAULT_PATH/.claude/hooks"
-  mkdir -p "$VAULT_PATH/.claude/skills/second-brain"
 fi
 
 WIKI_DIRS=$(find "$VAULT_PATH/wiki" -type d | wc -l | tr -d ' ')
@@ -594,7 +599,7 @@ tags: [index]
 | investigations | 0 |
 | **Total** | **0** |
 
-_Ingest your first source with \`/second-brain:capture\` to begin compounding._
+_Ingest your first source with \`/second-brain-capture\` to begin compounding._
 INDEXMD
 echo "  Wrote: wiki/index.md"
 
@@ -629,7 +634,7 @@ if [ "$BARE_MODE" = true ]; then
   echo "  Next steps:"
   echo "    cd $VAULT_PATH"
   echo "    Open in Obsidian: Open folder as vault"
-  echo "    Start capturing sources with /second-brain:capture"
+  echo "    Start capturing sources with /second-brain-capture"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   exit 0
 fi
@@ -676,7 +681,7 @@ if [ -d "$AGENTS_SRC" ]; then
 fi
 echo "  Agent definitions: $AGENT_DEFS copied"
 
-# Copy scoped second-brain skills (7 skills in subdirectories)
+# Copy flat second-brain skills (7 skills in subdirectories)
 SECOND_BRAIN_SRC="$BUNDLES_SRC/second-brain"
 if [ "$TEMPLATE_IS_PLUGIN" != true ] && [ -d "$TEMPLATE_SOURCE/.claude/skills/second-brain" ]; then
   SECOND_BRAIN_SRC="$TEMPLATE_SOURCE/.claude/skills/second-brain"
@@ -686,9 +691,10 @@ if [ -d "$SECOND_BRAIN_SRC" ]; then
   for skill_dir in "$SECOND_BRAIN_SRC"/*/; do
     [ -d "$skill_dir" ] || continue
     skill_name=$(basename "$skill_dir")
+    skill_full_name="second-brain-$skill_name"
     if [ -f "$skill_dir/SKILL.md" ]; then
-      mkdir -p "$VAULT_PATH/.claude/skills/second-brain/$skill_name"
-      cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/second-brain/$skill_name/"
+      mkdir -p "$VAULT_PATH/.claude/skills/$skill_full_name"
+      cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/$skill_full_name/"
       SKILL_INSTALLED=$((SKILL_INSTALLED + 1))
     fi
   done
@@ -696,7 +702,7 @@ fi
 if [ "$SKILL_INSTALLED" -gt 0 ]; then
   echo "  second-brain skills: $SKILL_INSTALLED installed"
 else
-  echo "  WARNING: no second-brain scoped skills found."
+  echo "  WARNING: no second-brain skills found."
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -1213,10 +1219,10 @@ check "hooks.json: no hardcoded ~/deep-tech-wiki" \
 AGENT_COUNT=$(ls "$VAULT_PATH/.claude/agents"/*.md 2>/dev/null | wc -l | tr -d ' ')
 check "3 agent definitions present" '[ "$AGENT_COUNT" -eq 3 ]'
 
-# Skills (7 scoped second-brain skills)
+# Skills (7 flat second-brain skills)
 for skill_name in capture query lint reconcile investigate synthesize status; do
-  check "second-brain/$skill_name SKILL.md present" \
-    "[ -f \"$VAULT_PATH/.claude/skills/second-brain/$skill_name/SKILL.md\" ]"
+  check "second-brain-$skill_name SKILL.md present" \
+    "[ -f \"$VAULT_PATH/.claude/skills/second-brain-$skill_name/SKILL.md\" ]"
 done
 
 # CLAUDE.md
@@ -1241,7 +1247,7 @@ echo "  Next steps:"
 echo "    1. cd $VAULT_PATH"
 echo "    2. Open in Obsidian: 'Open folder as vault'"
 echo "    3. Set MINERU_TOKEN in .env for PDF extraction"
-echo "    4. Run /second-brain:capture on your first source"
+echo "    4. Run /second-brain-capture on your first source"
 echo "    5. Run /brain-init:brain-init --validate to verify vault health"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 

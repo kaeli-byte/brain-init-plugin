@@ -220,8 +220,8 @@ fi
 echo ""
 echo "── Skill Health ──"
 
-SKILL_BASE="$VAULT_PATH/.claude/skills/second-brain"
-SKILL_DIRS="capture query lint reconcile investigate synthesize status"
+SKILL_BASE="$VAULT_PATH/.claude/skills"
+SKILL_DIRS="second-brain-capture second-brain-query second-brain-lint second-brain-reconcile second-brain-investigate second-brain-synthesize second-brain-status"
 SKILL_OK=0
 SKILL_FAIL=0
 for d in $SKILL_DIRS; do
@@ -233,14 +233,14 @@ content = open('$SKILL_MD').read()
 if content.startswith('---'):
     yaml.safe_load(content.split('---')[1])
 " 2>/dev/null; then
-      pass "  second-brain/$d/SKILL.md: valid frontmatter"
+      pass "  $d/SKILL.md: valid frontmatter"
       SKILL_OK=$((SKILL_OK + 1))
     else
-      fail "  second-brain/$d/SKILL.md: invalid frontmatter"
+      fail "  $d/SKILL.md: invalid frontmatter"
       SKILL_FAIL=$((SKILL_FAIL + 1))
     fi
   else
-    fail "  second-brain/$d/SKILL.md: not found"
+    fail "  $d/SKILL.md: not found"
     SKILL_FAIL=$((SKILL_FAIL + 1))
   fi
 done

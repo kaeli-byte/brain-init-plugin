@@ -1,6 +1,6 @@
 {
   "name": "brain-init",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Initialize Industrial Intelligence Brain vaults — directory tree, 18 schemas, Obsidian config, Claude Code hooks, agents, qmd collections, domain-adapted config (5 presets + custom). Self-contained: no external template repo required.",
   "author": { "name": "Kaeli Byte" },
   "homepage": "https://github.com/kaeli-byte/brain-init-plugin",

@@ -1,5 +1,5 @@
 ---
-name: query
+name: second-brain-query
 description: Answer questions against wiki knowledge using hybrid search (qmd + lexical) with evidence citations and confidence calibration.
 version: 1.0.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]

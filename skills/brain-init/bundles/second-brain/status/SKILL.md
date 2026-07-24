@@ -1,5 +1,5 @@
 ---
-name: status
+name: second-brain-status
 description: Show wiki health dashboard — page counts, sources ingested, claims by confidence, active contradictions, orphans, stale pages, and knowledge gaps.
 version: 1.0.0
 tools: [Read, Grep, Glob, Bash]

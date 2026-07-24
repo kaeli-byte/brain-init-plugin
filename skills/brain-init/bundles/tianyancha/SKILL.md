@@ -129,10 +129,10 @@ A-share filings from `cfi-filings`:
 python3 $S call --api-name "tianyancha_api_call" \
   --params-json '{"api_call_name":"工商信息-企业基本信息","api_call_params":{"keyword":"<full company name>"},"file_path":"<vault>/raw/tianyancha/company-basic-info.csv"}'
 
-# 2. Read the CSV and extract claims via /second-brain:capture
+# 2. Read the CSV and extract claims via /second-brain-capture
 # Registration date, legal representative, registered capital, status
 
-# 3. Cross-reference with existing wiki company page via /second-brain:reconcile
+# 3. Cross-reference with existing wiki company page via /second-brain-reconcile
 ```
 
 ## Combined US + China intelligence stack

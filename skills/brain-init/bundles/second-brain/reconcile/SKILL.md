@@ -1,5 +1,5 @@
 ---
-name: reconcile
+name: second-brain-reconcile
 description: >
   Reconcile a newly ingested source against existing wiki knowledge. Classifies every candidate
   claim into one of six dispositions — new, corroborating, updating, contradicting, superseding,

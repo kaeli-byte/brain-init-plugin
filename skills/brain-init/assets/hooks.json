@@ -11,7 +11,7 @@
       "event": "PostToolUse",
       "description": "Trigger lint reminder when wiki pages are edited",
       "matcher": "tool == 'Edit' && tool_input.file_path matches 'wiki/.*\\.md$'",
-      "command": "#!/bin/bash\necho '[Wiki Hook] Page edited. Consider running /second-brain:lint if this was a significant update.'"
+      "command": "#!/bin/bash\necho '[Wiki Hook] Page edited. Consider running /second-brain-lint if this was a significant update.'"
     },
     {
       "name": "wiki-index-reminder",

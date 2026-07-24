@@ -208,10 +208,10 @@ needed when using the CLI.
 
 ## Integration with Wiki Ingestion
 
-This skill is the **first step** in the `/second-brain:capture` pipeline. After conversion:
+This skill is the **first step** in the `/second-brain-capture` pipeline. After conversion:
 
 1. Verify markdown quality (check headers, financial sections present)
-2. Run `/second-brain:capture` or use specialist agents for claim extraction
+2. Run `/second-brain-capture` or use specialist agents for claim extraction
 3. Clean up intermediate files after successful ingestion
 
 ```bash
@@ -219,5 +219,5 @@ This skill is the **first step** in the `/second-brain:capture` pipeline. After 
 python3 .claude/skills/mineru-batch/mineru-batch.py raw/annual-reports/ -o raw/annual-reports/
 
 # Ingest each converted markdown
-# (use parallel agents or sequential /second-brain:capture commands)
+# (use parallel agents or sequential /second-brain-capture commands)
 ```

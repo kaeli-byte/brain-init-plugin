@@ -17,7 +17,7 @@ Status: ✅ All three collections active (qmd v1.0.9, 94 docs indexed, 11,480 ve
 |---|---|---|---|
 | `brain-knowledge` | `wiki/` (symlink: `brain-knowledge/`) | 78 | Canonical claims, companies, technologies, markets, etc. Wiki-type enabled (`qmd wiki init`). |
 | `brain-sources` | `wiki/sources/` (symlink: `brain-sources/`) | 16 | Primary-source records, evidence maps, interpretation warnings |
-| `brain-investigations` | `wiki/investigations/` (symlink: `brain-investigations/`) | 0 | Strategic questions, theses, counterevidence, decisions (populated by `/second-brain:investigate`) |
+| `brain-investigations` | `wiki/investigations/` (symlink: `brain-investigations/`) | 0 | Strategic questions, theses, counterevidence, decisions (populated by `/second-brain-investigate`) |
 
 Collection contexts are set — qmd knows what each collection contains for better query routing.
 

@@ -1,5 +1,5 @@
 ---
-name: investigate
+name: second-brain-investigate
 description: >
   Open a structured investigation against the wiki. Researcher gathers evidence, analyst tests
   the thesis. Produces a decision-ready document with thesis, counterevidence, unknowns, and

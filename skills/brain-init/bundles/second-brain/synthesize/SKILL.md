@@ -1,5 +1,5 @@
 ---
-name: synthesize
+name: second-brain-synthesize
 description: >
   Generate cross-source syntheses on topics or weekly intelligence digests. Identifies patterns,
   contradictions, gaps, and produces strategic assessments across multiple sources.
