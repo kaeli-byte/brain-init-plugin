@@ -715,9 +715,95 @@ if [ -d "$BASES_SRC" ]; then
 fi
 echo "  Base views: $BASE_COUNT files"
 
+# ── detect_obsidian_version ────────────────────────────────────
+# Returns the installed Obsidian version string (e.g. "1.12.7")
+# or empty string if not found. Tries standard macOS/Windows/Linux paths.
+detect_obsidian_version() {
+  local plist="/Applications/Obsidian.app/Contents/Info.plist"
+  if [ -f "$plist" ] && command -v plutil &>/dev/null; then
+    plutil -p "$plist" 2>/dev/null | sed -n 's/.*"CFBundleShortVersionString".*"\(.*\)"/\1/p'
+    return
+  fi
+  # Also check homebrew-installed Obsidian
+  plist="/opt/homebrew/Caskroom/obsidian/latest/Obsidian.app/Contents/Info.plist"
+  if [ -f "$plist" ] && command -v plutil &>/dev/null; then
+    plutil -p "$plist" 2>/dev/null | sed -n 's/.*"CFBundleShortVersionString".*"\(.*\)"/\1/p'
+    return
+  fi
+  # echo nothing if not found
+}
+
+# ── find_compatible_release ─────────────────────────────────────
+# Given a GitHub repo and optional Obsidian version, prints the
+# best compatible release tag. Falls back to latest if version
+# detection fails or no compatible release is found.
+# Uses python3 to fetch releases, download manifest.json from each,
+# and compare minAppVersion against the installed Obsidian version.
+find_compatible_release() {
+  local repo="$1"
+  local obs_version="$2"
+  python3 -c "
+import json, sys, subprocess
+
+repo = '$repo'
+obs_ver = '$obs_version'
+
+def parse_ver(v):
+    try:
+        parts = v.strip().split('.')
+        return tuple(int(p) if p.isdigit() else 0 for p in parts[:3])
+    except Exception:
+        return (0, 0, 0)
+
+def is_compatible(min_ver_str):
+    if not min_ver_str or min_ver_str.strip() == '':
+        return True
+    try:
+        return parse_ver(obs_ver) >= parse_ver(min_ver_str)
+    except Exception:
+        return True
+
+def curl_json(url):
+    try:
+        r = subprocess.run(
+            ['curl', '-sSL', '--connect-timeout', '10', '--max-time', '30', url],
+            capture_output=True, text=True, timeout=35
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            return json.loads(r.stdout)
+    except Exception:
+        pass
+    return None
+
+releases = curl_json('https://api.github.com/repos/' + repo + '/releases?per_page=20')
+if not releases:
+    print('', end='')
+    sys.exit(0)
+
+for rel in releases:
+    tag = rel.get('tag_name', '')
+    if not tag:
+        continue
+    manifest = curl_json(
+        'https://github.com/' + repo + '/releases/download/' + tag + '/manifest.json'
+    )
+    if not manifest:
+        continue
+    min_ver = manifest.get('minAppVersion', '')
+    if is_compatible(min_ver):
+        print(tag, end='')
+        sys.exit(0)
+
+# No compatible release found — output latest tag
+print(releases[0].get('tag_name', ''), end='')
+" 2>/dev/null
+}
+
 # ── download_obsidian_plugins ──────────────────────────────────
 # Downloads community plugins declared in community-plugins.json
-# from their GitHub releases. Requires: python3, curl.
+# from their GitHub releases. Detects installed Obsidian version
+# and selects the newest release compatible with it.
+# Requires: python3, curl.
 download_obsidian_plugins() {
   local vault_path="$1"
   local community_json="$vault_path/.obsidian/community-plugins.json"
@@ -743,6 +829,15 @@ for p in plugins:
   if [ -z "$plugin_ids" ]; then
     echo "  Plugins: empty plugin list — nothing to download"
     return 0
+  fi
+
+  # Detect installed Obsidian version for compatibility checks
+  local obs_version
+  obs_version=$(detect_obsidian_version)
+  if [ -n "$obs_version" ]; then
+    echo "  Obsidian: v$obs_version detected — will select compatible plugin versions"
+  else
+    echo "  Obsidian: not detected — downloading latest plugin versions"
   fi
 
   # Fetch community plugins registry from Obsidian's official list
@@ -787,11 +882,16 @@ for p in registry:
       continue
     fi
 
-    # Fetch latest release tag
+    # Find the best release tag (compatible with installed Obsidian, or latest)
     local tag
-    tag=$(curl -sL --connect-timeout 10 --max-time 30 \
-      "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | \
-      python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+    tag=$(find_compatible_release "$repo" "$obs_version")
+
+    if [ -z "$tag" ]; then
+      # Fallback: try /releases/latest directly
+      tag=$(curl -sL --connect-timeout 10 --max-time 30 \
+        "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | \
+        python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+    fi
 
     if [ -z "$tag" ]; then
       echo "  Plugins: $plugin_id — could not fetch release tag, skipping"
