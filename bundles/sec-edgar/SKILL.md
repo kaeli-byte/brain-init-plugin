@@ -157,7 +157,7 @@ python3 $S call --api-name "sec_edgar_get_company_events" \
 
 ## Integration with wiki ingestion
 
-SEC EDGAR CSV data feeds the wiki's `/capture` pipeline:
+SEC EDGAR CSV data feeds the wiki's `/second-brain:capture` pipeline:
 
 ```bash
 # 1. Pull company info + financials
@@ -167,11 +167,11 @@ python3 $S call --api-name "sec_edgar_get_company_info" \
 python3 $S call --api-name "sec_edgar_get_financial_statements" \
   --params-json '{"ticker":"AAPL","statement":"all","file_path":"<vault>/raw/sec-edgar/AAPL-financials.csv"}'
 
-# 2. Read the CSV and extract claims via /capture
+# 2. Read the CSV and extract claims via /second-brain:capture
 # The CSV contains structured numbers — use these to create/update
 # claim pages with revenue, profit, margin, cash flow, etc.
 
-# 3. Cross-reference with existing claims via /reconcile
+# 3. Cross-reference with existing claims via /second-brain:reconcile
 ```
 
 The CSV output is far more efficient than PDF → mineru for financial data.

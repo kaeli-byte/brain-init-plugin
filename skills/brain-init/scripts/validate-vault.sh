@@ -220,28 +220,31 @@ fi
 echo ""
 echo "── Skill Health ──"
 
-SKILL_MD="$VAULT_PATH/.claude/skills/second-brain/SKILL.md"
-if [ -f "$SKILL_MD" ]; then
-  pass "second-brain SKILL.md present"
-  if python3 -c "
+SKILL_BASE="$VAULT_PATH/.claude/skills/second-brain"
+SKILL_DIRS="capture query lint reconcile investigate synthesize status"
+SKILL_OK=0
+SKILL_FAIL=0
+for d in $SKILL_DIRS; do
+  SKILL_MD="$SKILL_BASE/$d/SKILL.md"
+  if [ -f "$SKILL_MD" ]; then
+    if python3 -c "
 import yaml
 content = open('$SKILL_MD').read()
 if content.startswith('---'):
     yaml.safe_load(content.split('---')[1])
 " 2>/dev/null; then
-    pass "  SKILL.md: valid frontmatter"
+      pass "  second-brain/$d/SKILL.md: valid frontmatter"
+      SKILL_OK=$((SKILL_OK + 1))
+    else
+      fail "  second-brain/$d/SKILL.md: invalid frontmatter"
+      SKILL_FAIL=$((SKILL_FAIL + 1))
+    fi
   else
-    fail "  SKILL.md: invalid frontmatter"
+    fail "  second-brain/$d/SKILL.md: not found"
+    SKILL_FAIL=$((SKILL_FAIL + 1))
   fi
-  CMD_COUNT=$(grep -c '^### \`/' "$SKILL_MD" 2>/dev/null || echo '0')
-  if [ "$CMD_COUNT" -ge 5 ]; then
-    pass "  SKILL.md: $CMD_COUNT commands defined"
-  else
-    warn "  SKILL.md: only $CMD_COUNT commands defined"
-  fi
-else
-  fail "second-brain SKILL.md not found"
-fi
+done
+echo "    $SKILL_OK passed, $SKILL_FAIL failed"
 
 # ═══════════════════════════════════════════════════════════════
 # 7. qmd Health
