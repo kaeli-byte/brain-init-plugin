@@ -184,9 +184,27 @@ jobs:
           print('All SKILL.md files: valid frontmatter')
           PYEOF
 
+  version-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Check version bumps
+        run: python3 .github/scripts/check-versions.py
+
   smoke-test:
     runs-on: ubuntu-latest
-    needs: [validate, bundle-check]
+    needs: [validate, bundle-check, version-gate]
     steps:
       - uses: actions/checkout@v7
 
