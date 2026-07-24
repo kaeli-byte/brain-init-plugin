@@ -3,11 +3,8 @@
 This directory contains Obsidian vault configuration only (JSON files).
 Community plugins (dataview, templater, obsidian-git) are NOT bundled.
 
-After brain-init creates your vault, open it in Obsidian with "Safe Mode" off.
-Obsidian will automatically download the declared plugins on first open.
+During `brain-init`, the script automatically downloads plugins declared in
+`community-plugins.json` from their GitHub releases. Requires: python3, curl.
 
-If you need the plugins built during initialization:
-```
-/brain-init:brain-init --install-obsidian-plugins ~/my-brain
-```
-(Requires git, node, and npm. Coming in v1.1.)
+If the download fails (offline, rate-limited), open the vault in Obsidian
+and install them manually from Settings → Community plugins.

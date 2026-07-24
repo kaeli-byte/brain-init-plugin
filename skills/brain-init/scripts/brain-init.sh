@@ -715,6 +715,124 @@ if [ -d "$BASES_SRC" ]; then
 fi
 echo "  Base views: $BASE_COUNT files"
 
+# ── download_obsidian_plugins ──────────────────────────────────
+# Downloads community plugins declared in community-plugins.json
+# from their GitHub releases. Requires: python3, curl.
+download_obsidian_plugins() {
+  local vault_path="$1"
+  local community_json="$vault_path/.obsidian/community-plugins.json"
+  local plugins_dir="$vault_path/.obsidian/plugins"
+
+  if [ ! -f "$community_json" ]; then
+    echo "  Plugins: no community-plugins.json — nothing to download"
+    return 0
+  fi
+
+  mkdir -p "$plugins_dir"
+
+  # Parse plugin IDs
+  local plugin_ids
+  plugin_ids=$(python3 -c "
+import json
+with open('$community_json') as f:
+    plugins = json.load(f)
+for p in plugins:
+    print(p)
+" 2>/dev/null)
+
+  if [ -z "$plugin_ids" ]; then
+    echo "  Plugins: empty plugin list — nothing to download"
+    return 0
+  fi
+
+  # Fetch community plugins registry from Obsidian's official list
+  echo "  Plugins: fetching community registry..."
+  local registry
+  registry=$(curl -sL --connect-timeout 10 --max-time 30 \
+    "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/community-plugins.json" 2>/dev/null)
+
+  if [ -z "$registry" ]; then
+    echo "  Plugins: WARNING — could not fetch community registry (network issue?)"
+    echo "  Plugins: Open vault in Obsidian and install manually: dataview, templater-obsidian, obsidian-git"
+    return 1
+  fi
+
+  local installed=0
+  local skipped=0
+  local failed=0
+
+  while IFS= read -r plugin_id; do
+    [ -z "$plugin_id" ] && continue
+
+    # Skip if already installed (main.js + manifest.json present)
+    if [ -f "$plugins_dir/$plugin_id/main.js" ] && [ -f "$plugins_dir/$plugin_id/manifest.json" ]; then
+      installed=$((installed + 1))
+      continue
+    fi
+
+    # Resolve plugin ID to GitHub repo
+    local repo
+    repo=$(echo "$registry" | python3 -c "
+import json, sys
+registry = json.load(sys.stdin)
+for p in registry:
+    if p.get('id') == '$plugin_id':
+        print(p.get('repo', ''))
+        break
+" 2>/dev/null)
+
+    if [ -z "$repo" ]; then
+      echo "  Plugins: $plugin_id — not found in community registry, skipping"
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    # Fetch latest release tag
+    local tag
+    tag=$(curl -sL --connect-timeout 10 --max-time 30 \
+      "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | \
+      python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null)
+
+    if [ -z "$tag" ]; then
+      echo "  Plugins: $plugin_id — could not fetch release tag, skipping"
+      failed=$((failed + 1))
+      continue
+    fi
+
+    # Download required files: main.js, manifest.json, styles.css (optional)
+    mkdir -p "$plugins_dir/$plugin_id"
+    local dl_ok=true
+
+    for file in main.js manifest.json styles.css; do
+      local url="https://github.com/$repo/releases/download/$tag/$file"
+      if ! curl -fsSL --connect-timeout 10 --max-time 30 \
+        -o "$plugins_dir/$plugin_id/$file" "$url" 2>/dev/null; then
+        # styles.css is optional — only fail if main.js or manifest.json is missing
+        if [ "$file" = "main.js" ] || [ "$file" = "manifest.json" ]; then
+          dl_ok=false
+          break
+        fi
+        # Remove empty file from failed optional download
+        rm -f "$plugins_dir/$plugin_id/$file"
+      fi
+    done
+
+    if [ "$dl_ok" = true ] && [ -f "$plugins_dir/$plugin_id/main.js" ] && [ -f "$plugins_dir/$plugin_id/manifest.json" ]; then
+      echo "  Plugins: $plugin_id v$tag installed"
+      installed=$((installed + 1))
+    else
+      echo "  Plugins: $plugin_id — download failed, skipping"
+      rm -rf "$plugins_dir/$plugin_id"
+      failed=$((failed + 1))
+    fi
+  done <<< "$plugin_ids"
+
+  local summary="installed=$installed"
+  [ "$skipped" -gt 0 ] && summary="$summary, skipped=$skipped"
+  [ "$failed" -gt 0 ] && summary="$summary, failed=$failed"
+  echo "  Plugins: $summary"
+}
+
 # ═══════════════════════════════════════════════════════════════
 # Phase 4: Obsidian
 # ═══════════════════════════════════════════════════════════════
@@ -740,7 +858,7 @@ if [ "$NO_OBSIDIAN" = false ]; then
       PLUGIN_COUNT=$(ls -d "$VAULT_PATH/.obsidian/plugins"/*/ 2>/dev/null | wc -l | tr -d ' ')
       echo "  Plugins: $PLUGIN_COUNT installed"
     else
-      echo "  Plugins: not bundled. Open vault in Obsidian to auto-download (dataview, templater, obsidian-git)."
+      download_obsidian_plugins "$VAULT_PATH"
     fi
   else
     echo "  WARNING: No Obsidian template directory found."
