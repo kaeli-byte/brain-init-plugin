@@ -1,0 +1,184 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install pyyaml
+
+      - name: Shell syntax check (bash -n)
+        run: |
+          find . -name '*.sh' -not -path './.git/*' -print0 | while IFS= read -r -d '' f; do
+            echo "Checking $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck lint
+        run: |
+          if ! command -v shellcheck &>/dev/null && command -v apt-get &>/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          fi
+          if command -v shellcheck &>/dev/null; then
+            find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 shellcheck --severity=warning
+          else
+            echo "shellcheck not available -- skipping"
+          fi
+
+      - name: Validate plugin.json
+        run: python3 -c 'import json; json.load(open(".claude-plugin/plugin.json")); print("plugin.json OK")'
+
+      - name: Validate marketplace.json
+        run: python3 -c 'import json; json.load(open(".claude-plugin/marketplace.json")); print("marketplace.json OK")'
+
+      - name: Validate hooks.json
+        run: python3 -c 'import json; h=json.load(open("assets/hooks.json")); print(f"hooks.json OK ({len(h.get(\"hooks\",[]))} hooks)")'
+
+      - name: Validate settings.json
+        run: python3 -c 'import json; json.load(open("assets/settings.json")); print("settings.json OK")'
+
+      - name: Validate all YAML schemas
+        run: |
+          python3 << 'PYEOF'
+          import yaml, os, sys
+          schema_dir = 'assets/schemas'
+          total = 0
+          failed = 0
+          for f in sorted(os.listdir(schema_dir)):
+              if f.endswith(('.yaml', '.yml')):
+                  total += 1
+                  path = os.path.join(schema_dir, f)
+                  try:
+                      with open(path) as fh:
+                          yaml.safe_load(fh)
+                      print(f'  OK  {f}')
+                  except Exception as e:
+                      print(f'  FAIL {f}: {e}')
+                      failed += 1
+          if failed:
+              print(f'\n{failed}/{total} schema(s) failed YAML validation')
+              sys.exit(1)
+          print(f'{total} schemas: all valid')
+          PYEOF
+
+      - name: Check no hardcoded legacy paths in hooks.json
+        run: |
+          if grep -qF '~/deep-tech-wiki' assets/hooks.json; then
+            echo "FAIL: hooks.json contains hardcoded ~/deep-tech-wiki"
+            exit 1
+          fi
+          echo "OK: no hardcoded legacy paths"
+
+      - name: Verify domain templates exist for all presets
+        run: |
+          PRESETS=(industrial-intelligence semiconductor biotech energy materials)
+          FAILED=0
+          for preset in "${PRESETS[@]}"; do
+            for tmpl in "skills/brain-init/templates/claude-md/${preset}.md" \
+                        "skills/brain-init/templates/purpose/${preset}.md"; do
+              if [ ! -f "$tmpl" ]; then
+                echo "MISSING: $tmpl"
+                FAILED=$((FAILED + 1))
+              fi
+            done
+          done
+          if [ "$FAILED" -gt 0 ]; then
+            echo "FAIL: $FAILED domain template(s) missing"
+            exit 1
+          fi
+          echo "OK: all ${#PRESETS[@]} presets have CLAUDE.md + purpose.md templates"
+
+      - name: Asset inventory (reporting only)
+        run: |
+          echo "=== Asset inventory ==="
+          echo "YAML schemas:  $(find assets/schemas -name '*.yaml' | wc -l | tr -d ' ')"
+          echo "Domain tmpl:   $(find skills/brain-init/templates -name '*.md' | wc -l | tr -d ' ')"
+          echo "Agents:        $(find assets/agents -name '*.md' | wc -l | tr -d ' ')"
+          echo "Config:        $(find assets/config -name '*.md' | wc -l | tr -d ' ')"
+          echo "Bases:         $(find assets/bases -name '*.base' | wc -l | tr -d ' ')"
+          echo "Obsidian:      $(find assets/obsidian -type f | wc -l | tr -d ' ')"
+          echo "Skill bundles: $(find bundles -name 'SKILL.md' | wc -l | tr -d ' ')"
+          echo "Shell scripts: $(find . -name '*.sh' -not -path './.git/*' | wc -l | tr -d ' ')"
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install pyyaml
+
+      - name: Smoke test -- scaffold and validate
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          echo "=== Full scaffold (semiconductor) ==="
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-full" \
+            --domain semiconductor \
+            --no-git \
+            --no-qmd \
+            --no-obsidian \
+            --no-supporting-skills
+          echo ""
+
+          echo "=== Bare scaffold ==="
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-bare" \
+            --bare \
+            --no-git
+          echo ""
+
+          echo "=== Validate the full scaffold ==="
+          bash skills/brain-init/scripts/validate-vault.sh "$TMP/test-full"
+          echo ""
+
+          echo "=== Verify CLAUDE.md was domain-adapted ==="
+          if grep -qi 'semiconductor\|chip\|fab' "$TMP/test-full/CLAUDE.md"; then
+            echo "OK: CLAUDE.md contains semiconductor domain keywords"
+          else
+            echo "WARN: CLAUDE.md may not be domain-adapted"
+          fi
+
+          echo ""
+          echo "=== All smoke tests passed ==="
+          rm -rf "$TMP"
+
+      - name: Smoke test -- upgrade harness
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$TMP/test-vault" \
+            --domain energy \
+            --no-git \
+            --no-qmd \
+            --no-obsidian \
+            --no-supporting-skills
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            --upgrade-harness "$TMP/test-vault"
+          echo "OK: upgrade harness ran without error"
+
+          rm -rf "$TMP"

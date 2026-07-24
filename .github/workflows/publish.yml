@@ -1,0 +1,78 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  ci-pass:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci-pass
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG  Version: $VERSION"
+
+      - name: Verify plugin.json version matches tag
+        run: |
+          JSON_VER=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          TAG_VER="${{ steps.version.outputs.version }}"
+          if [ "$JSON_VER" != "$TAG_VER" ]; then
+            echo "FAIL: plugin.json version ($JSON_VER) != tag version ($TAG_VER)"
+            echo "Update .claude-plugin/plugin.json before tagging."
+            exit 1
+          fi
+          echo "OK: plugin.json version $JSON_VER matches tag v$TAG_VER"
+
+      - name: Verify marketplace.json version matches tag
+        run: |
+          MKT_VER=$(python3 -c "import json; p=json.load(open('.claude-plugin/marketplace.json')); print(p['plugins'][0]['version'])")
+          TAG_VER="${{ steps.version.outputs.version }}"
+          if [ "$MKT_VER" != "$TAG_VER" ]; then
+            echo "FAIL: marketplace.json version ($MKT_VER) != tag version ($TAG_VER)"
+            exit 1
+          fi
+          echo "OK: marketplace.json version $MKT_VER matches tag v$TAG_VER"
+
+      - name: Generate changelog from commits since last tag
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "## Changes since $LAST_TAG" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            git log --pretty=format:'- %s (%h)' "$LAST_TAG..HEAD" >> CHANGELOG.md
+          else
+            echo "## Initial release" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            git log --pretty=format:'- %s (%h)' >> CHANGELOG.md
+          fi
+          echo "" >> CHANGELOG.md
+          echo "---" >> CHANGELOG.md
+          cat CHANGELOG.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.tag }}
+          body_path: CHANGELOG.md
+          generate_release_notes: true
+          files: |
+            skills/brain-init/SKILL.md
+            skills/brain-init/scripts/brain-init.sh
+            skills/brain-init/scripts/validate-vault.sh
+            .claude-plugin/plugin.json
+            .claude-plugin/marketplace.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
