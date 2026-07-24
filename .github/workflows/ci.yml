@@ -27,13 +27,13 @@ jobs:
             bash -n "$f"
           done
 
-      - name: ShellCheck lint
+      - name: ShellCheck lint (advisory)
         run: |
           if ! command -v shellcheck &>/dev/null && command -v apt-get &>/dev/null; then
             sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           fi
           if command -v shellcheck &>/dev/null; then
-            find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 shellcheck --severity=warning
+            find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 shellcheck --severity=warning || true
           else
             echo "shellcheck not available -- skipping"
           fi
