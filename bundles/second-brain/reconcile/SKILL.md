@@ -36,7 +36,7 @@ of six dispositions. The brain compounds; it doesn't duplicate.
    target claim (if applicable), reason, and confidence effect
 6. Delegate to **curator** to apply the manifest. Every page touched by the curator
    must have `last_reviewed` bumped to today's date.
-7. Run `/lint` to validate — ensure only declared affected pages changed
+7. Run `/second-brain:lint` to validate — ensure only declared affected pages changed
 8. Flag any `contradicting` or `superseding` dispositions for human review
 9. Update `index.md` and `log.md`
 
@@ -61,13 +61,13 @@ of six dispositions. The brain compounds; it doesn't duplicate.
 - Reconciliation manifest: every candidate with disposition, target claim, reason, confidence effect
 - New/updated claim pages applied by curator
 - Contradicting and superseding dispositions flagged for human review
-- Validation: `/lint` returns no critical issues
+- Validation: `/second-brain:lint` returns no critical issues
 - `index.md` and `log.md` updated
 
 ## Example
 
 ```
-/reconcile src-example-supplier-2026-annual-report
+/second-brain:reconcile src-example-supplier-2026-annual-report
 → Compares 2026 report against existing 2025 claims
 → 8 candidates: 3 corroborating, 2 updating, 1 new, 1 contradicting, 1 irrelevant
 → Updates 4 claim pages, creates 1 new, flags 1 for review
@@ -76,7 +76,7 @@ of six dispositions. The brain compounds; it doesn't duplicate.
 ### Walkthrough
 
 ```
-Human: /reconcile src-cooper-standard-2025-annual-report
+Human: /second-brain:reconcile src-cooper-standard-2025-annual-report
 
 Agent (Curator):
   1. Read source summary and extracted candidate claims
@@ -90,7 +90,7 @@ Agent (Curator):
        conflicts with existing claim C-2222222222222222 → disposition: contradicting
   4. Produce reconciliation manifest with all dispositions and reasons
   5. Apply manifest: update existing claims, create new ones, mark contradictions
-  6. Validate: /lint returns no critical issues
+  6. Validate: /second-brain:lint returns no critical issues
   7. Flag contradicting disposition for human review
   8. Report: "Reconciled 15 candidates: 6 corroborating, 3 updating, 2 new, 1 contradicting, 3 irrelevant"
 ```

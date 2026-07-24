@@ -56,7 +56,7 @@ When qmd is unavailable or the query is simple:
 ## Example
 
 ```
-/query "How does Apple's M4 NPU compare to Qualcomm's Hexagon for on-device LLM inference?"
+/second-brain:query "How does Apple's M4 NPU compare to Qualcomm's Hexagon for on-device LLM inference?"
 1. Read index.md → finds technology-apple-neural-engine, technology-qualcomm-hexagon
 2. Run qmd hybrid query: lexical + semantic, rerank
 3. Read those pages + related claims
@@ -70,7 +70,7 @@ When qmd is unavailable or the query is simple:
 ## Query Walkthrough
 
 ```
-Human: /query "What is the competitive landscape for on-device LLM inference chips?"
+Human: /second-brain:query "What is the competitive landscape for on-device LLM inference chips?"
 
 Agent:
   1. Read index.md → find relevant: technology-apple-neural-engine, technology-qualcomm-hexagon,

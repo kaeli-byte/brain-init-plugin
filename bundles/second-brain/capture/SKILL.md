@@ -94,7 +94,7 @@ When capture completes, these must exist:
 ## Examples
 
 ```
-/capture --profile annual-report-v1 raw/10k/apple-2025-10k.pdf
+/second-brain:capture --profile annual-report-v1 raw/10k/apple-2025-10k.pdf
 -- Saves to raw/10k/apple-2025-10k.html
 -- Extracts 15 claims -- claims/claim-apple-revenue-xyz, etc.
 -- Updates company-apple, market-consumer-electronics, technology-3nm
@@ -102,7 +102,7 @@ When capture completes, these must exist:
 ```
 
 ```
-/capture raw/patents/us12345678.pdf
+/second-brain:capture raw/patents/us12345678.pdf
   1. Convert PDF via mineru
   2. Read extracted markdown
   3. Determine: patent, assignee=Apple, tech=neural-engine

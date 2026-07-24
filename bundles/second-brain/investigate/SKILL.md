@@ -25,7 +25,7 @@ document with explicit unknowns and invalidation conditions.
 3. **Researcher** gathers evidence: qmd queries across all collections, reads relevant claims and sources, retrieves exact passages. For each claim used, verify cash conversion, organic vs acquired growth decomposition, and management-quality signals if available.
 4. **Analyst** tests the thesis: checks for counterevidence, alternative explanations, logical gaps, inconsistent definitions. Applies the moat assessment (widening or narrowing?) and capital allocation sensibility check.
 5. Write the investigation with all required sections: Decision question, Scope, Thesis, Supporting evidence, Counterevidence, Alternative explanations, Unknowns, Invalidation conditions, Implications by audience lens, Change history
-6. Run `/lint` — ensure all evidence locators resolve, all claim/source IDs exist
+6. Run `/second-brain:lint` — ensure all evidence locators resolve, all claim/source IDs exist
 7. Flag for human review — investigations always require human approval before becoming decision inputs
 
 ## Specialist Delegation
@@ -64,19 +64,20 @@ Convert an approved investigation into audience-specific decision documents. **R
 ## Output Contract
 
 - Investigation in `investigations/investigation-{kebab-question}.md` with all 10 required sections
-- `/lint` confirms all evidence locators resolve
-- Flagged for human review before `/decide` runs
+- `/second-brain:lint` confirms all evidence locators resolve
+- Flagged for human review before `/second-brain:investigate --action decide` runs (`/decide` is a sub-workflow of investigate, invoked via the same skill with a decision flag)
 - If approved: 4 audience-lens decision documents in `analyses/decision-{slug}-{lens}-{date}.md`
 
 ## Example
 
 ```
-/investigate "Does vehicle electrification increase coolant connector content per platform?"
+/second-brain:investigate "Does vehicle electrification increase coolant connector content per platform?"
 -> Researcher finds 12 claims, 3 sources
 -> Analyst identifies mechanism: separate cooling loops for battery/motor/electronics
 -> Conclusion: Supported — BEV platforms use ~22 connectors vs ~8 for ICE
 
-/decide ev-coolant-connector-content
+/second-brain:investigate --action decide ev-coolant-connector-content
+(`/decide` is a sub-workflow of investigate, invoked via the same skill with a decision flag)
 -> Reads approved investigation (review_state: analyst_approved)
 -> Produces neutral synthesis + 4 lens documents (Executive, BD, Product, Industrialization)
 ```

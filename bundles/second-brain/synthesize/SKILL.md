@@ -48,7 +48,7 @@ contradictions, and strategic signals into a coherent assessment.
 ## Example
 
 ```
-/synthesize "BEV thermal management supply chain"
+/second-brain:synthesize "BEV thermal management supply chain"
 -> Searches wiki for all pages related to topic
 -> Reads claims, sources, analyses, and entity pages
 -> Identifies patterns, contradictions, and gaps
