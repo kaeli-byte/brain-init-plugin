@@ -45,7 +45,13 @@ jobs:
         run: python3 -c 'import json; json.load(open(".claude-plugin/marketplace.json")); print("marketplace.json OK")'
 
       - name: Validate hooks.json
-        run: python3 -c 'import json; h=json.load(open("assets/hooks.json")); print(f"hooks.json OK ({len(h.get(\"hooks\",[]))} hooks)")'
+        run: |
+          python3 -c '
+          import json
+          h = json.load(open("assets/hooks.json"))
+          n = len(h.get("hooks", []))
+          print(f"hooks.json OK ({n} hooks)")
+          '
 
       - name: Validate settings.json
         run: python3 -c 'import json; json.load(open("assets/settings.json")); print("settings.json OK")'
