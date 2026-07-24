@@ -769,6 +769,19 @@ if [ -z "$CLAUDE_SRC" ] && [ "$TEMPLATE_IS_PLUGIN" != true ] && [ -f "$TEMPLATE_
   CLAUDE_SRC="$TEMPLATE_SOURCE/CLAUDE.md"
 fi
 
+# Fallback: use industrial-intelligence template for custom or unknown domains
+if [ -z "$CLAUDE_SRC" ]; then
+  for candidate in \
+    "$DOMAIN_TEMPLATES_SRC/claude-md/industrial-intelligence.md" \
+    "$SKILL_DIR/templates/claude-md/industrial-intelligence.md"; do
+    if [ -f "$candidate" ]; then
+      CLAUDE_SRC="$candidate"
+      echo "  (using industrial-intelligence template as fallback for '$DOMAIN')"
+      break
+    fi
+  done
+fi
+
 if [ -n "$CLAUDE_SRC" ] && [ -f "$CLAUDE_SRC" ]; then
   sed -e "s|{{DOMAIN}}|${DOMAIN_CUSTOM:-$DOMAIN}|g" \
       -e "s|{{DATE}}|${TODAY}|g" \
@@ -795,6 +808,19 @@ done
 # Legacy fallback
 if [ -z "$PURPOSE_SRC" ] && [ "$TEMPLATE_IS_PLUGIN" != true ] && [ -f "$TEMPLATE_SOURCE/config/purpose.md" ]; then
   PURPOSE_SRC="$TEMPLATE_SOURCE/config/purpose.md"
+fi
+
+# Fallback: use industrial-intelligence template for custom or unknown domains
+if [ -z "$PURPOSE_SRC" ]; then
+  for candidate in \
+    "$DOMAIN_TEMPLATES_SRC/purpose/industrial-intelligence.md" \
+    "$SKILL_DIR/templates/purpose/industrial-intelligence.md"; do
+    if [ -f "$candidate" ]; then
+      PURPOSE_SRC="$candidate"
+      echo "  (using industrial-intelligence purpose template as fallback for '$DOMAIN')"
+      break
+    fi
+  done
 fi
 
 if [ -n "$PURPOSE_SRC" ] && [ -f "$PURPOSE_SRC" ]; then
