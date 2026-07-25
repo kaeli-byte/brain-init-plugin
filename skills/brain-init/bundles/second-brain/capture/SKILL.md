@@ -80,7 +80,9 @@ These rules apply to `annual-report-v1` and `sec-filing-v1` when the source is a
 
 1. Build a **section map first** using headings from `raw/assets/high-signal-sections.md`.
 2. Do not paste large grep outputs into context; retain only `line_number: heading` entries.
-3. Prefer 8-15 targeted section reads over broad sequential reading.
+3. Prefer 8-15 targeted section reads over broad sequential reading -- a soft target, not a cap.
+   Adjacent Tier 1 headings may be covered by a single bounded read, and inspecting every Tier 1
+   section takes precedence over staying within the read-count range.
 4. For every selected heading, determine a bounded line range and read only that range.
 5. Extract candidate claims immediately after each section.
 6. If a material signal appears (for example a new product, customer, impairment, plant, technology,
@@ -118,7 +120,7 @@ When the source is large or complex, spawn specialist subagents:
 
 When capture completes, these must exist:
 - Source page in `wiki/sources/src-{kebab-title}.md` with `[[company-*]]` link
-- 5-6 claim pages in `wiki/claims/claim-{kebab}-{uuid}.md` with `source_evidence` (or more when materiality warrants)
+- 2-6 claim pages in `wiki/claims/claim-{kebab}-{uuid}.md` with `source_evidence` (target 5-6; fewer than 5 only when materiality does not support more -- never pad to hit a quota)
 - Company page created or updated in `wiki/companies/company-{name}.md` with `[[src-*]]` link
 - Log entry finalized in `wiki/log.md`
 - `wiki/index.md` updated with new counts

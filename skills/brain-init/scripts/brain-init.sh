@@ -247,12 +247,17 @@ if [ "$UPGRADE_HARNESS" = true ]; then
     fi
 
     # Update capture skill reference assets (high-signal section locators)
+    HS_ASSET="$SECOND_BRAIN_SRC/capture/assets/high-signal-sections.md"
     if [ -d "$SECOND_BRAIN_SRC/capture/assets" ]; then
+        if [ ! -f "$HS_ASSET" ]; then
+            echo "  ERROR: capture reference asset missing: $HS_ASSET" >&2
+            exit 1
+        fi
         mkdir -p "$VAULT_PATH/raw/assets"
-        for f in "$SECOND_BRAIN_SRC/capture/assets/"*.md; do
-            [ -f "$f" ] || continue
-            cp "$f" "$VAULT_PATH/raw/assets/"
-        done
+        cp "$HS_ASSET" "$VAULT_PATH/raw/assets/" || {
+            echo "  ERROR: failed to copy high-signal-sections.md to $VAULT_PATH/raw/assets/" >&2
+            exit 1
+        }
         echo "  capture reference assets: updated"; UPGRADED=$((UPGRADED + 1))
     fi
 
@@ -716,15 +721,18 @@ else
 fi
 
 # Copy capture skill reference assets (high-signal section locators) into the vault
+HS_ASSET="$SECOND_BRAIN_SRC/capture/assets/high-signal-sections.md"
 if [ -d "$SECOND_BRAIN_SRC/capture/assets" ]; then
+  if [ ! -f "$HS_ASSET" ]; then
+    echo "  ERROR: capture reference asset missing: $HS_ASSET" >&2
+    exit 1
+  fi
   mkdir -p "$VAULT_PATH/raw/assets"
-  ASSET_COUNT=0
-  for f in "$SECOND_BRAIN_SRC/capture/assets/"*.md; do
-    [ -f "$f" ] || continue
-    cp "$f" "$VAULT_PATH/raw/assets/"
-    ASSET_COUNT=$((ASSET_COUNT + 1))
-  done
-  [ "$ASSET_COUNT" -gt 0 ] && echo "  capture reference assets: $ASSET_COUNT installed to raw/assets/"
+  cp "$HS_ASSET" "$VAULT_PATH/raw/assets/" || {
+    echo "  ERROR: failed to copy high-signal-sections.md to $VAULT_PATH/raw/assets/" >&2
+    exit 1
+  }
+  echo "  capture reference assets: installed to raw/assets/"
 fi
 
 # ═══════════════════════════════════════════════════════════════
