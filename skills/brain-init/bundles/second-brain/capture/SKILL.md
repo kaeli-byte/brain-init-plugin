@@ -3,7 +3,7 @@ name: second-brain-capture
 description: >
   Ingest a source (10-K, patent, report, paper) into the wiki. Extracts claims, writes source summary,
   updates entities, and ensures bidirectional source-company wikilinks.
-version: 1.0.0
+version: 1.1.0
 tools: [Read, Edit, Grep, Glob, Bash, Write]
 ---
 
@@ -17,19 +17,31 @@ bidirectional source-company wikilinks that make the wiki graph navigable.
 
 ## Workflow
 
-1. **Determine source type** -- 10K, patent, report, paper, white-paper, etc.
+1. **Determine source type** -- 10K, China annual report, patent, report, paper, white-paper, etc.
 2. **Save original** to `raw/{type}/{company}-{year}-{title}.{ext}`
 3. **Convert to markdown** using `mineru` (primary). Split documents over 200 pages into ranges
    (1-200, 201-400, ...) and stitch. Fallback: `pdftotext -layout`. Both PDF and `.md` are
    git-excluded (rebuildable).
-4. **Grep before reading** -- search for financial patterns first
-   (`grep -n -iE 'revenue|profit|margin|cash.flow|R&D|debt|risk'`) to locate high-signal
-   sections before reading. Prevents context-budget destruction from multi-megabyte files.
-5. **Read the markdown** thoroughly, targeting high-signal sections identified by grep.
+4. **Locate high-signal sections before reading** -- for annual reports and 10-Ks, use the
+   section-heading patterns in `raw/assets/high-signal-sections.md`.
+   - Use grep as a **navigation tool**, not as the extraction step.
+   - Keep only section names and line numbers in context.
+   - Build a compact section map before loading section bodies.
+   - Use the US/10-K locator set for SEC-style filings and the China locator set for Chinese listed-company annual reports.
+   - Generic keyword grep may be used later for targeted follow-up, but not as the primary navigation method.
+5. **Read only high-signal sections** -- never read a large annual report sequentially or load the
+   full markdown into context.
+   - **Tier 1:** always inspect.
+   - **Tier 2:** inspect when material, referenced by Tier 1, or needed to resolve an open research question.
+   - **Tier 3:** inspect only when specifically relevant.
+   - Read bounded line ranges from one located heading to the next heading of equal or higher level.
+   - Extract useful evidence and candidate claims from each section before reading the next section.
+   - Stop retrieval when the material research questions in the active extraction profile are sufficiently answered.
 6. **Write a WIP log entry** (see CLAUDE.md for recovery pattern).
 7. **Extract claims** -- write each significant claim to
-   `wiki/claims/claim-{kebab}-{uuid}.md`. Target 5-6 claims per source (minimum 2).
-   Set `last_reviewed` to today's date on every new claim. Follow materiality policy.
+   `wiki/claims/claim-{kebab}-{uuid}.md`. Target 5-6 claims per source (minimum 2), but do not
+   create low-value claims merely to satisfy a quota. Set `last_reviewed` to today's date on every
+   new claim. Follow materiality policy.
 8. **Write source summary** to `wiki/sources/src-{kebab-title}.md`. Set `last_reviewed`.
 9. **Update all relevant entity pages** and bump `last_reviewed` on every modified page:
    companies, technologies, people, industries, markets, regulations, standards, products,
@@ -46,7 +58,13 @@ bidirectional source-company wikilinks that make the wiki graph navigable.
 
 ## Extraction Profiles
 
-Use `--profile` to apply source-type-specific extraction guidance. **All profiles follow the interrogative method from `raw/assets/How to read an annual report in 30 minutes.md` -- don't read, interrogate.**
+Use `--profile` to apply source-type-specific extraction guidance. **All profiles follow the
+interrogative method from `raw/assets/How to read an annual report in 30 minutes.md` -- don't read,
+interrogate.**
+
+For annual reports, the profile defines **what questions to answer** while
+`raw/assets/high-signal-sections.md` defines **where to look first**. Keep those concerns separate:
+profiles drive analysis; the high-signal file drives navigation.
 
 | Profile | Source Types | Key Extraction Targets |
 |---|---|---|
@@ -56,6 +74,22 @@ Use `--profile` to apply source-type-specific extraction guidance. **All profile
 | `industry-report-v1` | McKinsey, Gartner, etc. | Market sizing, growth rates, competitive dynamics, technology trends, forecast methodology, author incentives/bias assessment. |
 | `tech-paper-v1` | arXiv, IEEE, ACM | Key innovation, performance claims, methodology, benchmarks, limitations, comparison to prior art, commercial readiness assessment. |
 
+## Annual Report Retrieval Rules
+
+These rules apply to `annual-report-v1` and `sec-filing-v1` when the source is a long annual report.
+
+1. Build a **section map first** using headings from `raw/assets/high-signal-sections.md`.
+2. Do not paste large grep outputs into context; retain only `line_number: heading` entries.
+3. Prefer 8-15 targeted section reads over broad sequential reading -- a soft target, not a cap.
+   Adjacent Tier 1 headings may be covered by a single bounded read, and inspecting every Tier 1
+   section takes precedence over staying within the read-count range.
+4. For every selected heading, determine a bounded line range and read only that range.
+5. Extract candidate claims immediately after each section.
+6. If a material signal appears (for example a new product, customer, impairment, plant, technology,
+   or strategy), run a narrow follow-up grep for that topic and inspect only the relevant ranges.
+7. Do not read low-signal sections merely for completeness.
+8. The full converted markdown remains the source of truth and can be revisited when verification is needed.
+
 ## Batch Mode
 
 Ingest multiple sources at once. **CRITICAL: Each source gets the full deep extraction treatment --
@@ -63,12 +97,12 @@ no lightweight/skim profiles.** Run the complete capture workflow for every file
 
 **Flow:**
 1. Glob all files matching pattern
-2. For each: run complete workflow (convert -- read -- extract claims -- write source + company -- update index)
+2. For each: run complete workflow (convert -- locate high-signal sections -- targeted read -- extract claims -- write source + company -- update index)
 3. Process **one by one sequentially** -- never batch-create lightweight profiles
 4. Generate summary report: sources processed, claims extracted, pages updated, contradictions flagged
 5. Update `index.md` and `log.md`
 
-**Anti-pattern:** Creating source and company pages without reading the extracted markdown and
+**Anti-pattern:** Creating source and company pages without reading the relevant extracted markdown and
 extracting claims. Every source must produce claims -- that's how the brain compounds.
 
 ## Specialist Delegation
@@ -86,7 +120,7 @@ When the source is large or complex, spawn specialist subagents:
 
 When capture completes, these must exist:
 - Source page in `wiki/sources/src-{kebab-title}.md` with `[[company-*]]` link
-- 5-6 claim pages in `wiki/claims/claim-{kebab}-{uuid}.md` with `source_evidence`
+- 2-6 claim pages in `wiki/claims/claim-{kebab}-{uuid}.md` with `source_evidence` (target 5-6; fewer than 5 only when materiality does not support more -- never pad to hit a quota)
 - Company page created or updated in `wiki/companies/company-{name}.md` with `[[src-*]]` link
 - Log entry finalized in `wiki/log.md`
 - `wiki/index.md` updated with new counts
@@ -96,9 +130,11 @@ When capture completes, these must exist:
 
 ```
 /second-brain:capture --profile annual-report-v1 raw/10k/apple-2025-10k.pdf
--- Saves to raw/10k/apple-2025-10k.html
--- Extracts 15 claims -- claims/claim-apple-revenue-xyz, etc.
--- Updates company-apple, market-consumer-electronics, technology-3nm
+-- Converts source to markdown
+-- Builds high-signal section map
+-- Reads only material Tier 1 / Tier 2 sections
+-- Extracts material claims
+-- Updates company, market, product, technology and source pages as relevant
 -- Logs the operation
 ```
 

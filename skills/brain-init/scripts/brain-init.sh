@@ -246,6 +246,21 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         echo "  second-brain skills: $SKILL_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
     fi
 
+    # Update capture skill reference assets (high-signal section locators)
+    HS_ASSET="$SECOND_BRAIN_SRC/capture/assets/high-signal-sections.md"
+    if [ -d "$SECOND_BRAIN_SRC/capture/assets" ]; then
+        if [ ! -f "$HS_ASSET" ]; then
+            echo "  ERROR: capture reference asset missing: $HS_ASSET" >&2
+            exit 1
+        fi
+        mkdir -p "$VAULT_PATH/raw/assets"
+        cp "$HS_ASSET" "$VAULT_PATH/raw/assets/" || {
+            echo "  ERROR: failed to copy high-signal-sections.md to $VAULT_PATH/raw/assets/" >&2
+            exit 1
+        }
+        echo "  capture reference assets: updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
     # Update schemas (add new, overwrite existing)
     if [ -d "$SCHEMAS_SRC" ]; then
         SCHEMA_NEW=$(ls "$SCHEMAS_SRC"/*.yaml 2>/dev/null | wc -l | tr -d ' ')
@@ -703,6 +718,21 @@ if [ "$SKILL_INSTALLED" -gt 0 ]; then
   echo "  second-brain skills: $SKILL_INSTALLED installed"
 else
   echo "  WARNING: no second-brain skills found."
+fi
+
+# Copy capture skill reference assets (high-signal section locators) into the vault
+HS_ASSET="$SECOND_BRAIN_SRC/capture/assets/high-signal-sections.md"
+if [ -d "$SECOND_BRAIN_SRC/capture/assets" ]; then
+  if [ ! -f "$HS_ASSET" ]; then
+    echo "  ERROR: capture reference asset missing: $HS_ASSET" >&2
+    exit 1
+  fi
+  mkdir -p "$VAULT_PATH/raw/assets"
+  cp "$HS_ASSET" "$VAULT_PATH/raw/assets/" || {
+    echo "  ERROR: failed to copy high-signal-sections.md to $VAULT_PATH/raw/assets/" >&2
+    exit 1
+  }
+  echo "  capture reference assets: installed to raw/assets/"
 fi
 
 # ═══════════════════════════════════════════════════════════════
