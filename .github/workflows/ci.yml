@@ -145,6 +145,11 @@ jobs:
           fi
           echo "OK: all Python files pass syntax check"
 
+      - name: Runtime unit and fixture tests
+        run: |
+          PYTHONPATH=skills/brain-init/runtime \
+          python3 -m unittest discover -s skills/brain-init/runtime/tests -v
+
       - name: Validate SKILL.md frontmatter (all bundles)
         run: |
           python3 << 'PYEOF'
@@ -245,6 +250,64 @@ jobs:
             echo "FAIL: CLAUDE.md not domain-adapted"
             exit 1
           fi
+          rm -rf "$TMP"
+
+      - name: Smoke test -- shadow rejection preserves artifacts
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          VAULT="$TMP/shadow-reject"
+
+          bash skills/brain-init/scripts/brain-init.sh \
+            "$VAULT" \
+            --domain industrial-intelligence \
+            --no-git --no-qmd --no-obsidian --no-supporting-skills
+
+          mkdir -p "$VAULT/raw/annual-reports"
+          printf 'fixture\n' > "$VAULT/raw/annual-reports/acme-2025.pdf"
+          cat > "$VAULT/wiki/claims/invalid-claim.md" <<'EOF'
+          ---
+          id: claim-invalid
+          type: claim
+          status: supported
+          ---
+
+          # Invalid claim
+          EOF
+          printf '["wiki/claims/invalid-claim.md"]\n' > "$TMP/declared-paths.json"
+
+          RUN_ID="$(
+            PYTHONPATH="$VAULT/.brain/runtime" \
+            python3 -m brain_runtime.cli start \
+              --vault "$VAULT" \
+              --operation capture \
+              --mode shadow \
+              --profile annual-report-v1 \
+              --input raw/annual-reports/acme-2025.pdf
+          )"
+          PYTHONPATH="$VAULT/.brain/runtime" \
+          python3 -m brain_runtime.cli declare \
+            --vault "$VAULT" \
+            --run-id "$RUN_ID" \
+            --paths-file "$TMP/declared-paths.json"
+
+          set +e
+          VERIFY_OUTPUT="$(
+            PYTHONPATH="$VAULT/.brain/runtime" \
+            python3 -m brain_runtime.cli verify \
+              --vault "$VAULT" \
+              --run-id "$RUN_ID" 2>&1
+          )"
+          VERIFY_STATUS=$?
+          set -e
+
+          [ "$VERIFY_STATUS" -eq 0 ] || { echo "$VERIFY_OUTPUT"; echo "FAIL: shadow verify blocked capture"; exit 1; }
+          grep -q 'Runtime shadow: REJECT' <<<"$VERIFY_OUTPUT" || { echo "$VERIFY_OUTPUT"; echo "FAIL: expected shadow rejection"; exit 1; }
+          [ -f "$VAULT/wiki/claims/invalid-claim.md" ] || { echo "FAIL: shadow rejection removed canonical artifact"; exit 1; }
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["accepted"] is False' \
+            "$VAULT/.brain/runs/$RUN_ID/verification.json"
+
+          echo "OK: shadow rejection preserved the invalid canonical artifact"
           rm -rf "$TMP"
 
       - name: Smoke test -- all 5 domain presets

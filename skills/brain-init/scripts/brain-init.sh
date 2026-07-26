@@ -32,6 +32,7 @@ find_plugin_root() {
 }
 
 # ── Defaults ──────────────────────────────────────────────────
+BRAIN_INIT_VERSION="1.2.0"
 DOMAIN="${BRAIN_DOMAIN:-industrial-intelligence}"
 DOMAIN_CUSTOM=""
 VAULT_PATH=""
@@ -114,7 +115,7 @@ fi
 # ── --validate mode ───────────────────────────────────────────
 if [ "$VALIDATE_MODE" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  brain-init v1.0.0 — Validate mode"
+    echo "  brain-init v${BRAIN_INIT_VERSION} — Validate mode"
     echo "  Vault:   $VAULT_PATH"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
@@ -132,7 +133,7 @@ fi
 # ── --upgrade-harness mode ────────────────────────────────────
 if [ "$UPGRADE_HARNESS" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  brain-init v1.0.0 — Upgrade harness mode"
+    echo "  brain-init v${BRAIN_INIT_VERSION} — Upgrade harness mode"
     echo "  Vault:   $VAULT_PATH"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
@@ -319,7 +320,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
     fi
 
     # Append log entry
-    LOG_LINE="## [${TODAY}] brain-init | Harness upgraded | brain-init v1.0.0"
+    LOG_LINE="## [${TODAY}] brain-init | Harness upgraded | brain-init v${BRAIN_INIT_VERSION}"
     if ! grep -qF "$LOG_LINE" "$VAULT_PATH/wiki/log.md" 2>/dev/null; then
         printf "\n%s\n- %d harness components updated from %s\n" "$LOG_LINE" "$UPGRADED" \
             "$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo 'brain-init plugin' || echo "$TEMPLATE_SOURCE")" \
@@ -355,7 +356,7 @@ VAULT_NAME="${VAULT_NAME:-$(basename "$VAULT_PATH")}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  brain-init v1.0.0"
+echo "  brain-init v${BRAIN_INIT_VERSION}"
 echo "  Vault:   $VAULT_PATH"
 echo "  Name:    $VAULT_NAME"
 echo "  Domain:  $DOMAIN"
@@ -399,7 +400,7 @@ else
     if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/brain-init/assets/schemas" ]; then
         TEMPLATE_SOURCE="$PLUGIN_ROOT"
         TEMPLATE_IS_PLUGIN=true
-        echo "  Template source: $TEMPLATE_SOURCE (brain-init plugin v1.0.0)"
+        echo "  Template source: $TEMPLATE_SOURCE (brain-init plugin v${BRAIN_INIT_VERSION})"
     elif [ -d "$HOME/deep-tech-wiki/templates/schemas" ]; then
         TEMPLATE_SOURCE="$HOME/deep-tech-wiki"
         echo "  Template source: $TEMPLATE_SOURCE (legacy: ~/deep-tech-wiki)"
@@ -643,7 +644,7 @@ INDEXMD
 echo "  Wrote: wiki/index.md"
 
 # Write wiki/log.md
-LOG_SOURCE_DESC="$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo 'brain-init plugin v1.0.0' || echo "$TEMPLATE_SOURCE")"
+LOG_SOURCE_DESC="$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo "brain-init plugin v${BRAIN_INIT_VERSION}" || echo "$TEMPLATE_SOURCE")"
 cat > "$VAULT_PATH/wiki/log.md" << LOGMD
 ---
 tags: [log]
@@ -654,7 +655,7 @@ created: ${TODAY}
 
 Append-only chronological record of all brain operations.
 
-## [${TODAY}] brain-init | Vault created | brain-init v1.0.0
+## [${TODAY}] brain-init | Vault created | brain-init v${BRAIN_INIT_VERSION}
 - Domain: ${DOMAIN}
 - Mode: $([ "$BARE_MODE" = true ] && echo 'bare' || echo 'full')
 - Template: ${LOG_SOURCE_DESC}

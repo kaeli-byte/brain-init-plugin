@@ -1,6 +1,6 @@
 ---
 name: brain-init
-version: 1.1.2
+version: 1.2.0
 description: >
   Initialize a new Industrial Intelligence Brain vault. Creates the full harness —
   directory tree, 18 page-type schemas, Obsidian vault config, ECC hooks, agent

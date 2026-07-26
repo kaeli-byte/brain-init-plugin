@@ -58,6 +58,31 @@ Update harness files from the plugin's bundled assets while preserving all wiki 
 → Updated 23 harness files. Wiki content preserved (142 pages).
 ```
 
+## Capture runtime (shadow mode)
+
+When the runtime is installed, capture uses shadow instrumentation by default:
+
+```bash
+# default when the runtime is installed
+/second-brain-capture raw/annual-reports/acme-2025.pdf
+
+# explicitly disable shadow instrumentation for a session
+BRAIN_RUNTIME_MODE=off
+```
+
+Each instrumented capture writes operational records under its run directory:
+
+```text
+.brain/runs/<run-id>/manifest.json
+.brain/runs/<run-id>/events.jsonl
+.brain/runs/<run-id>/plan.json
+.brain/runs/<run-id>/artifacts.json
+.brain/runs/<run-id>/verification.json
+```
+
+These files are operational records, not canonical wiki knowledge. A shadow
+`REJECT` is advisory and does not alter, remove, or roll back capture results.
+
 ## Domain Presets
 
 | Preset | Focus |
