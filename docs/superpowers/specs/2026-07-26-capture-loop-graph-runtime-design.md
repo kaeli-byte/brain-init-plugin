@@ -1,7 +1,9 @@
 # Capture Loop-Graph Runtime — Design
 
-**Date:** 2026-07-26  
-**Status:** Approved design  
+**Date:** 2026-07-26
+
+**Status:** Approved design
+
 **Scope:** `second-brain-capture` pilot only; runtime interfaces are intentionally operation-agnostic so `reconcile`, `investigate`, and `synthesize` can adopt them later.
 
 ## 1. Goal

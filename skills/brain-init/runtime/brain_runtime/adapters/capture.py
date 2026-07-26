@@ -6,7 +6,7 @@ from typing import Any
 import yaml
 
 from ..contracts import ArtifactRef, CheckResult
-from ..trace import read_events
+from ..trace import read_events, read_json_nofollow
 
 
 CLAIM_REQUIRED = {
@@ -282,17 +282,15 @@ def _source_checks(
 
 
 def _workflow_checks(vault: Path, run_dir: Path) -> list[CheckResult]:
-    with (run_dir / "manifest.json").open(encoding="utf-8") as manifest_file:
-        manifest = json.load(manifest_file)
+    manifest = read_json_nofollow(run_dir / "manifest.json")
     metadata = manifest.get("metadata") or {}
     inputs = manifest.get("inputs") or []
     source_type = metadata.get("source_type")
     plan_path = run_dir / "plan.json"
     plan: dict[str, Any] = {}
-    if plan_path.is_file():
+    if plan_path.exists() or plan_path.is_symlink():
         try:
-            with plan_path.open(encoding="utf-8") as plan_file:
-                loaded_plan = json.load(plan_file)
+            loaded_plan = read_json_nofollow(plan_path)
             if isinstance(loaded_plan, dict):
                 plan = loaded_plan
         except (OSError, json.JSONDecodeError):
@@ -417,6 +415,10 @@ def capture_checks(
                 artifact=artifact.path,
                 message=f"missing required fields: {', '.join(missing)}",
             ))
+        elif artifact.path == "wiki/log.md":
+            # The append-only root log is completed by the capture workflow.
+            # workflow.log_completed is its authoritative integrity signal.
+            continue
         else:
             checks.append(_check(
                 "page.last_reviewed",

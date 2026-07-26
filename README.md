@@ -40,13 +40,18 @@ Initialize a new brain vault.
 
 ### `/brain-init:brain-init --validate <path>`
 
-Health-check an existing vault. Runs 9 checks: directory structure, schema YAML,
-types.json coverage, hook integrity, agent definitions, skill health, qmd health,
-external dependencies, and git state.
+Health-check an existing vault. Runs 11 validation sections covering directory
+structure, schema YAML, types.json coverage, hook integrity, agent definitions,
+skill health, the Brain Runtime, qmd health, wiki/root integrity, external
+dependencies, and git state. The validator reports granular pass, failure, and
+warning totals.
 
 ```
 /brain-init:brain-init --validate ~/brain-semiconductors
-→ PASS: 9/9 checks passed. Vault is healthy.
+→ Validation Complete
+  Passed:   <checks passed>
+  Failed:   0
+  Warnings: <environment-dependent warnings>
 ```
 
 ### `/brain-init:brain-init --upgrade-harness <path>`
@@ -70,12 +75,13 @@ When the runtime is installed, capture uses shadow instrumentation by default:
 BRAIN_RUNTIME_MODE=off
 ```
 
-Each instrumented capture writes operational records under its run directory:
+An instrumented capture can write these operational records under its run
+directory:
 
 ```text
 .brain/runs/<run-id>/manifest.json
 .brain/runs/<run-id>/events.jsonl
-.brain/runs/<run-id>/plan.json
+.brain/runs/<run-id>/plan.json          # optional when planning is used
 .brain/runs/<run-id>/artifacts.json
 .brain/runs/<run-id>/verification.json
 ```

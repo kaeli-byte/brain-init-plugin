@@ -233,6 +233,35 @@ class CaptureVerifyTests(unittest.TestCase):
         self.assertTrue(EXPECTED_CHECK_IDS.issubset({check.id for check in report.checks}))
         self.assertFalse([check for check in report.checks if not check.passed])
 
+    def test_complete_capture_artifact_set_accepts_root_index_and_log(self):
+        index_path = self.vault / "wiki/index.md"
+        index_path.write_text(
+            "---\n"
+            "last_reviewed: 2026-07-26\n"
+            "---\n"
+            "# Index\n",
+            encoding="utf-8",
+        )
+        log_path = self.vault / "wiki/log.md"
+        log_path.write_text(
+            "---\n"
+            "tags: [log]\n"
+            "created: 2026-07-26\n"
+            "---\n"
+            "# Operations Log\n",
+            encoding="utf-8",
+        )
+        self.paths.extend(["wiki/index.md", "wiki/log.md"])
+
+        report = self._verify()
+
+        self.assertTrue(report.accepted)
+        self.assertFalse([
+            check
+            for check in self._checks(report, "page.last_reviewed")
+            if check.artifact == "wiki/log.md"
+        ])
+
     def test_missing_source_evidence_is_rejected(self):
         report = self._verify(claim_fixture="invalid-claim-no-source.md")
 

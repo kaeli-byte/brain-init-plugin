@@ -204,6 +204,79 @@ class CliTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "completed")
         self.assertFalse(manifest["shadow_verdict"])
 
+    def test_single_slice_plan_persists_context_flag_for_annual_report_verify(self):
+        first_claim = self.vault / self.paths[0]
+        second_claim = first_claim.with_name("claim-acme-revenue-second.md")
+        second_claim.write_text(
+            first_claim.read_text(encoding="utf-8").replace(
+                "claim-acme-revenue-12345678",
+                "claim-acme-revenue-87654321",
+            ),
+            encoding="utf-8",
+        )
+        self.paths.insert(1, second_claim.relative_to(self.vault).as_posix())
+        start = self._run(
+            "start",
+            "--vault",
+            self.vault,
+            "--operation",
+            "capture",
+            "--mode",
+            "shadow",
+            "--profile",
+            "small-document-v1",
+            "--input",
+            "raw/annual-reports/acme-2025-annual-report.pdf",
+        )
+        run_id = start.stdout.strip()
+        run_dir = self.vault / ".brain" / "runs" / run_id
+        request_file = self.vault / "section-map-single.json"
+        shutil.copyfile(FIXTURES / "section-map-single.json", request_file)
+
+        self._run(
+            "plan",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--request-file",
+            request_file,
+        )
+        self._run(
+            "event",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--kind",
+            "workflow.log",
+            "--label",
+            "capture.log",
+            "--data-json",
+            '{"passed":true}',
+        )
+        self._run(
+            "declare",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--paths-file",
+            self._write_json("single-slice-paths.json", self.paths),
+        )
+
+        plan = json.loads((run_dir / "plan.json").read_text(encoding="utf-8"))
+        self.assertIn("exceeds_one_context", plan)
+        self.assertIs(plan["exceeds_one_context"], False)
+        verified = self._run(
+            "verify",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+        )
+        self.assertIn("Runtime shadow: ACCEPT", verified.stdout)
+
     def test_event_rejects_forbidden_trace_data_without_recording_it(self):
         run_id = self._start()
         run_dir = self.vault / ".brain" / "runs" / run_id

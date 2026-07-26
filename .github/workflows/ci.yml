@@ -240,7 +240,64 @@ jobs:
           PYTHONPATH="$TMP/test-full/.brain/runtime" python3 -c 'import brain_runtime; print(brain_runtime.__version__)'
 
           echo "=== Validate the scaffold ==="
-          bash skills/brain-init/scripts/validate-vault.sh "$TMP/test-full"
+          set +e
+          VALIDATE_OUTPUT="$(
+            bash skills/brain-init/scripts/validate-vault.sh "$TMP/test-full" 2>&1
+          )"
+          VALIDATE_STATUS=$?
+          set -e
+          printf '%s\n' "$VALIDATE_OUTPUT"
+          [ "$VALIDATE_STATUS" -eq 0 ] || { echo "FAIL: fresh scaffold validation failed"; exit 1; }
+          UNEXPECTED_WARNINGS="$(
+            printf '%s\n' "$VALIDATE_OUTPUT" |
+              grep '\[WARN\]' |
+              grep -Ev 'types\.json not found|Index freshness:|qmd(:| symlink| .+not initialized)|pdftotext:|agent_gw:|KIMI_API_KEY:|KIMI_BASE_URL:|KIMI connectivity:|MINERU_TOKEN:|Git: not initialized' ||
+              true
+          )"
+          [ -z "$UNEXPECTED_WARNINGS" ] || {
+            printf '%s\n' "$UNEXPECTED_WARNINGS"
+            echo "FAIL: fresh scaffold emitted an unclassified validator warning"
+            exit 1
+          }
+
+          echo "=== Validate legacy vault without runtime ==="
+          LEGACY_RUNTIME_VAULT="$TMP/test-legacy-runtime"
+          cp -R "$TMP/test-full" "$LEGACY_RUNTIME_VAULT"
+          rm -rf "$LEGACY_RUNTIME_VAULT/.brain"
+          set +e
+          LEGACY_VALIDATE_OUTPUT="$(
+            bash skills/brain-init/scripts/validate-vault.sh \
+              "$LEGACY_RUNTIME_VAULT" 2>&1
+          )"
+          LEGACY_VALIDATE_STATUS=$?
+          set -e
+          [ "$LEGACY_VALIDATE_STATUS" -eq 0 ] || {
+            printf '%s\n' "$LEGACY_VALIDATE_OUTPUT"
+            echo "FAIL: legacy missing-runtime vault must remain valid"
+            exit 1
+          }
+          RUNTIME_WARNINGS="$(
+            printf '%s\n' "$LEGACY_VALIDATE_OUTPUT" |
+              awk '
+                /── Brain Runtime ──/ { in_runtime=1; next }
+                /── qmd Health ──/ { in_runtime=0 }
+                in_runtime && /\[WARN\]/ {
+                  sub(/^[[:space:]]+/, "")
+                  print
+                }
+              '
+          )"
+          EXPECTED_RUNTIME_WARNINGS="$(printf '%s\n' \
+            '[WARN] .brain/runs/ — MISSING' \
+            '[WARN] .brain/evals/ — MISSING' \
+            '[WARN] brain runtime code — MISSING' \
+            '[WARN] brain runtime import failed — capture will run without shadow instrumentation')"
+          [ "$RUNTIME_WARNINGS" = "$EXPECTED_RUNTIME_WARNINGS" ] || {
+            printf 'Expected runtime warnings:\n%s\nActual runtime warnings:\n%s\n' \
+              "$EXPECTED_RUNTIME_WARNINGS" "$RUNTIME_WARNINGS"
+            exit 1
+          }
+          echo "OK: legacy missing runtime remains warning-only"
           echo ""
 
           echo "=== Verify CLAUDE.md was domain-adapted ==="
@@ -400,21 +457,335 @@ jobs:
         run: |
           TMP="$(mktemp -d)"
           export CLAUDE_PLUGIN_ROOT="$PWD"
+          VAULT="$TMP/test-vault"
 
-          bash skills/brain-init/scripts/brain-init.sh \
-            "$TMP/test-vault" \
-            --domain energy \
-            --no-git --no-qmd --no-obsidian --no-supporting-skills
+          mkdir -p \
+            "$VAULT/wiki" \
+            "$VAULT/raw" \
+            "$VAULT/.claude/hooks" \
+            "$VAULT/.claude/agents" \
+            "$VAULT/.claude/skills" \
+            "$VAULT/.brain/runtime/brain_runtime" \
+            "$VAULT/templates/schemas" \
+            "$VAULT/Templates/Bases" \
+            "$VAULT/config"
+          printf '%s\n' '# Legacy log' > "$VAULT/wiki/log.md"
+          printf '%s\n' 'preserve wiki' > "$VAULT/wiki/user-page.md"
+          printf '%s\n' 'preserve raw' > "$VAULT/raw/user-source.txt"
+          printf '%s\n' 'stale runtime' \
+            > "$VAULT/.brain/runtime/brain_runtime/stale-runtime.txt"
+          printf '%s\n' '# custom gitignore entry' '*.private' > "$VAULT/.gitignore"
+          printf '%s\n' '# custom claudeignore entry' 'private-notes/' \
+            > "$VAULT/.claudeignore"
 
-          mkdir -p "$TMP/test-vault/.brain/runs/preserve-me" "$TMP/test-vault/.brain/evals"
-          echo keep > "$TMP/test-vault/.brain/runs/preserve-me/marker.txt"
-          echo labels > "$TMP/test-vault/.brain/evals/human-labels.jsonl"
+          bash skills/brain-init/scripts/brain-init.sh --upgrade-harness "$VAULT"
 
-          bash skills/brain-init/scripts/brain-init.sh \
-            --upgrade-harness "$TMP/test-vault"
-          [ -f "$TMP/test-vault/.brain/runs/preserve-me/marker.txt" ] || { echo "FAIL: upgrade deleted run history"; exit 1; }
-          [ -f "$TMP/test-vault/.brain/evals/human-labels.jsonl" ] || { echo "FAIL: upgrade deleted eval labels"; exit 1; }
-          PYTHONPATH="$TMP/test-vault/.brain/runtime" python3 -c 'import brain_runtime'
-          echo "OK: upgrade harness ran without error"
+          [ -d "$VAULT/.brain/runs" ] || { echo "FAIL: upgrade did not migrate .brain/runs"; exit 1; }
+          [ -d "$VAULT/.brain/evals" ] || { echo "FAIL: upgrade did not migrate .brain/evals"; exit 1; }
+          [ -f "$VAULT/.brain/runtime/brain_runtime/cli.py" ] || { echo "FAIL: current runtime missing"; exit 1; }
+          [ ! -e "$VAULT/.brain/runtime/brain_runtime/stale-runtime.txt" ] || { echo "FAIL: stale runtime survived replacement"; exit 1; }
+          if find "$VAULT/.brain/runtime/brain_runtime" -type l -print -quit | grep -q .; then
+            echo "FAIL: installed runtime contains a symlink"
+            exit 1
+          fi
+          grep -qxF '/.brain/runs/' "$VAULT/.gitignore" || { echo "FAIL: run history gitignore rule missing"; exit 1; }
+          grep -qxF '.brain/runs/' "$VAULT/.claudeignore" || { echo "FAIL: run history claudeignore rule missing"; exit 1; }
+          grep -qxF '*.private' "$VAULT/.gitignore" || { echo "FAIL: custom gitignore content changed"; exit 1; }
+          grep -qxF 'private-notes/' "$VAULT/.claudeignore" || { echo "FAIL: custom claudeignore content changed"; exit 1; }
+          [ -f "$VAULT/wiki/user-page.md" ] || { echo "FAIL: wiki content was not preserved"; exit 1; }
+          [ -f "$VAULT/raw/user-source.txt" ] || { echo "FAIL: raw content was not preserved"; exit 1; }
 
+          mkdir -p "$VAULT/.brain/runs/preserve-me"
+          printf '%s\n' keep > "$VAULT/.brain/runs/preserve-me/marker.txt"
+          printf '%s\n' labels > "$VAULT/.brain/evals/human-labels.jsonl"
+          printf '%s\n' 'stale again' \
+            > "$VAULT/.brain/runtime/brain_runtime/stale-runtime.txt"
+
+          bash skills/brain-init/scripts/brain-init.sh --upgrade-harness "$VAULT"
+
+          [ -f "$VAULT/.brain/runs/preserve-me/marker.txt" ] || { echo "FAIL: upgrade deleted run history"; exit 1; }
+          [ -f "$VAULT/.brain/evals/human-labels.jsonl" ] || { echo "FAIL: upgrade deleted eval labels"; exit 1; }
+          [ ! -e "$VAULT/.brain/runtime/brain_runtime/stale-runtime.txt" ] || { echo "FAIL: repeat upgrade did not replace stale runtime"; exit 1; }
+          [ "$(grep -cFx '/.brain/runs/' "$VAULT/.gitignore")" -eq 1 ] || { echo "FAIL: gitignore migration is not idempotent"; exit 1; }
+          [ "$(grep -cFx '.brain/runs/' "$VAULT/.claudeignore")" -eq 1 ] || { echo "FAIL: claudeignore migration is not idempotent"; exit 1; }
+          PYTHONPATH="$VAULT/.brain/runtime" python3 -c 'import brain_runtime'
+          echo "OK: legacy upgrade replaced runtime, migrated ownership, and preserved state"
+
+          rm -rf "$TMP"
+
+      - name: Smoke test -- upgrade runtime ownership symlink is refused
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+
+          make_upgrade_vault() {
+            local vault="$1"
+            mkdir -p \
+              "$vault/wiki" \
+              "$vault/.claude/hooks" \
+              "$vault/.claude/agents" \
+              "$vault/.claude/skills" \
+              "$vault/templates/schemas" \
+              "$vault/Templates/Bases" \
+              "$vault/config" \
+              "$vault/.brain"
+            printf '%s\n' '# Legacy log' > "$vault/wiki/log.md"
+          }
+
+          UPGRADE_VAULT="$TMP/upgrade-vault"
+          UPGRADE_EXTERNAL="$TMP/upgrade-external-runtime"
+          make_upgrade_vault "$UPGRADE_VAULT"
+          mkdir -p "$UPGRADE_EXTERNAL/brain_runtime"
+          printf '%s\n' 'do not delete' \
+            > "$UPGRADE_EXTERNAL/brain_runtime/external-sentinel.txt"
+          ln -s "$UPGRADE_EXTERNAL" "$UPGRADE_VAULT/.brain/runtime"
+
+          set +e
+          UPGRADE_OUTPUT="$(
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$UPGRADE_VAULT" 2>&1
+          )"
+          UPGRADE_STATUS=$?
+          set -e
+          [ "$UPGRADE_STATUS" -ne 0 ] || { echo "FAIL: upgrade accepted symlinked runtime ownership"; exit 1; }
+          grep -qi 'symlinked runtime ownership' <<<"$UPGRADE_OUTPUT" || { printf '%s\n' "$UPGRADE_OUTPUT"; exit 1; }
+          [ -f "$UPGRADE_EXTERNAL/brain_runtime/external-sentinel.txt" ] || { echo "FAIL: upgrade changed external sentinel"; exit 1; }
+          [ -L "$UPGRADE_VAULT/.brain/runtime" ] || { echo "FAIL: upgrade replaced ownership symlink"; exit 1; }
+
+          echo "OK: upgrade refuses symlinked runtime ownership"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- force install runtime ownership symlink is refused
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          FORCE_VAULT="$TMP/force-vault"
+          FORCE_EXTERNAL="$TMP/force-external-runtime"
+          mkdir -p "$FORCE_VAULT/wiki" "$FORCE_VAULT/.brain"
+          printf '%s\n' '# Existing vault' > "$FORCE_VAULT/wiki/log.md"
+          mkdir -p "$FORCE_EXTERNAL/brain_runtime"
+          printf '%s\n' 'do not delete' \
+            > "$FORCE_EXTERNAL/brain_runtime/external-sentinel.txt"
+          ln -s "$FORCE_EXTERNAL" "$FORCE_VAULT/.brain/runtime"
+
+          set +e
+          FORCE_OUTPUT="$(
+            bash skills/brain-init/scripts/brain-init.sh \
+              "$FORCE_VAULT" \
+              --force --domain industrial-intelligence \
+              --no-git --no-qmd --no-obsidian --no-supporting-skills 2>&1
+          )"
+          FORCE_STATUS=$?
+          set -e
+          [ "$FORCE_STATUS" -ne 0 ] || { echo "FAIL: force install accepted symlinked runtime ownership"; exit 1; }
+          grep -qi 'symlinked runtime ownership' <<<"$FORCE_OUTPUT" || { printf '%s\n' "$FORCE_OUTPUT"; exit 1; }
+          [ -f "$FORCE_EXTERNAL/brain_runtime/external-sentinel.txt" ] || { echo "FAIL: force install changed external sentinel"; exit 1; }
+          [ -L "$FORCE_VAULT/.brain/runtime" ] || { echo "FAIL: force install replaced ownership symlink"; exit 1; }
+
+          echo "OK: force install refuses symlinked runtime ownership"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- symlinked runtime source is refused
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          VAULT="$TMP/vault"
+          TEMPLATE="$TMP/template"
+          EXTERNAL_SOURCE="$TMP/external-source"
+
+          mkdir -p \
+            "$VAULT/wiki" \
+            "$VAULT/.claude/hooks" \
+            "$VAULT/.claude/agents" \
+            "$VAULT/.claude/skills" \
+            "$VAULT/templates/schemas" \
+            "$VAULT/Templates/Bases" \
+            "$VAULT/config" \
+            "$VAULT/.brain/runtime/brain_runtime" \
+            "$TEMPLATE/.brain/runtime" \
+            "$EXTERNAL_SOURCE"
+          printf '%s\n' '# Legacy log' > "$VAULT/wiki/log.md"
+          printf '%s\n' 'old runtime' \
+            > "$VAULT/.brain/runtime/brain_runtime/old-runtime.txt"
+          cp -R skills/brain-init/runtime/brain_runtime \
+            "$EXTERNAL_SOURCE/brain_runtime"
+          ln -s "$EXTERNAL_SOURCE/brain_runtime" \
+            "$TEMPLATE/.brain/runtime/brain_runtime"
+
+          set +e
+          SOURCE_OUTPUT="$(
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$VAULT" \
+              --template-path "$TEMPLATE" 2>&1
+          )"
+          SOURCE_STATUS=$?
+          set -e
+
+          [ "$SOURCE_STATUS" -ne 0 ] || { echo "FAIL: upgrade accepted symlinked runtime source"; exit 1; }
+          grep -qi 'symlinked runtime source' <<<"$SOURCE_OUTPUT" || { printf '%s\n' "$SOURCE_OUTPUT"; exit 1; }
+          [ -f "$VAULT/.brain/runtime/brain_runtime/old-runtime.txt" ] || { echo "FAIL: rejected source replaced prior runtime"; exit 1; }
+          [ ! -L "$VAULT/.brain/runtime/brain_runtime" ] || { echo "FAIL: source symlink was installed"; exit 1; }
+
+          echo "OK: symlinked runtime source is refused"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- active runtime replacement lock is refused
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          VAULT="$TMP/vault"
+
+          mkdir -p \
+            "$VAULT/wiki" \
+            "$VAULT/.claude/hooks" \
+            "$VAULT/.claude/agents" \
+            "$VAULT/.claude/skills" \
+            "$VAULT/templates/schemas" \
+            "$VAULT/Templates/Bases" \
+            "$VAULT/config" \
+            "$VAULT/.brain/runtime/brain_runtime" \
+            "$VAULT/.brain/runtime/.brain-runtime-install.lock"
+          printf '%s\n' '# Legacy log' > "$VAULT/wiki/log.md"
+          printf '%s\n' 'old runtime' \
+            > "$VAULT/.brain/runtime/brain_runtime/old-runtime.txt"
+
+          set +e
+          LOCK_OUTPUT="$(
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$VAULT" 2>&1
+          )"
+          LOCK_STATUS=$?
+          set -e
+
+          [ "$LOCK_STATUS" -ne 0 ] || { echo "FAIL: upgrade ignored active replacement lock"; exit 1; }
+          grep -qi 'runtime replacement is already in progress' <<<"$LOCK_OUTPUT" || { printf '%s\n' "$LOCK_OUTPUT"; exit 1; }
+          grep -qi 'remove it only after confirming no installer is active' <<<"$LOCK_OUTPUT" || { printf '%s\n' "$LOCK_OUTPUT"; exit 1; }
+          [ -f "$VAULT/.brain/runtime/brain_runtime/old-runtime.txt" ] || { echo "FAIL: locked upgrade replaced prior runtime"; exit 1; }
+
+          echo "OK: active runtime replacement lock is refused"
+          rm -rf "$TMP"
+
+      - name: Smoke test -- failed runtime rollback preserves backup
+        run: |
+          TMP="$(mktemp -d)"
+          export CLAUDE_PLUGIN_ROOT="$PWD"
+          VAULT="$TMP/vault"
+
+          mkdir -p \
+            "$VAULT/wiki" \
+            "$VAULT/.claude/hooks" \
+            "$VAULT/.claude/agents" \
+            "$VAULT/.claude/skills" \
+            "$VAULT/templates/schemas" \
+            "$VAULT/Templates/Bases" \
+            "$VAULT/config" \
+            "$VAULT/.brain/runtime/brain_runtime" \
+            "$TMP/bin"
+          printf '%s\n' '# Legacy log' > "$VAULT/wiki/log.md"
+          printf '%s\n' 'old runtime' \
+            > "$VAULT/.brain/runtime/brain_runtime/old-runtime.txt"
+
+          REAL_MV="$(command -v mv)"
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            'count=0' \
+            'if [ -f "$BRAIN_INIT_TEST_MV_COUNT" ]; then IFS= read -r count < "$BRAIN_INIT_TEST_MV_COUNT"; fi' \
+            'count=$((count + 1))' \
+            'printf "%s\n" "$count" > "$BRAIN_INIT_TEST_MV_COUNT"' \
+            'if [ "$count" -eq "${BRAIN_INIT_TEST_APPEAR_ON_CALL:-0}" ]; then' \
+            '  mkdir -p "$BRAIN_INIT_TEST_APPEARING_TARGET"' \
+            '  printf "%s\n" "# foreign runtime" > "$BRAIN_INIT_TEST_APPEARING_TARGET/__init__.py"' \
+            'fi' \
+            'case " $BRAIN_INIT_TEST_FAIL_MV_CALLS " in *" $count "*) exit 73 ;; esac' \
+            'exec "$BRAIN_INIT_TEST_REAL_MV" "$@"' \
+            > "$TMP/bin/mv"
+          chmod +x "$TMP/bin/mv"
+
+          set +e
+          ROLLBACK_OUTPUT="$(
+            PATH="$TMP/bin:$PATH" \
+            BRAIN_INIT_TEST_REAL_MV="$REAL_MV" \
+            BRAIN_INIT_TEST_MV_COUNT="$TMP/mv-count" \
+            BRAIN_INIT_TEST_FAIL_MV_CALLS="2 3" \
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$VAULT" 2>&1
+          )"
+          ROLLBACK_STATUS=$?
+          set -e
+
+          [ "$ROLLBACK_STATUS" -ne 0 ] || { echo "FAIL: injected runtime replacement failure was ignored"; exit 1; }
+          grep -qi 'previous runtime preserved at' <<<"$ROLLBACK_OUTPUT" || { printf '%s\n' "$ROLLBACK_OUTPUT"; exit 1; }
+          find "$VAULT/.brain/runtime" -name old-runtime.txt -type f -print -quit |
+            grep -q . || { echo "FAIL: failed rollback deleted previous runtime backup"; exit 1; }
+          [ ! -d "$VAULT/.brain/runtime/.brain-runtime-install.lock" ] || { echo "FAIL: failed replacement left active lock"; exit 1; }
+
+          APPEAR_FAIL_VAULT="$TMP/appear-fail-vault"
+          mkdir -p \
+            "$APPEAR_FAIL_VAULT/wiki" \
+            "$APPEAR_FAIL_VAULT/.claude/hooks" \
+            "$APPEAR_FAIL_VAULT/.claude/agents" \
+            "$APPEAR_FAIL_VAULT/.claude/skills" \
+            "$APPEAR_FAIL_VAULT/templates/schemas" \
+            "$APPEAR_FAIL_VAULT/Templates/Bases" \
+            "$APPEAR_FAIL_VAULT/config" \
+            "$APPEAR_FAIL_VAULT/.brain/runtime/brain_runtime"
+          printf '%s\n' '# Legacy log' > "$APPEAR_FAIL_VAULT/wiki/log.md"
+          printf '%s\n' 'old runtime' \
+            > "$APPEAR_FAIL_VAULT/.brain/runtime/brain_runtime/old-runtime.txt"
+
+          set +e
+          APPEAR_FAIL_OUTPUT="$(
+            PATH="$TMP/bin:$PATH" \
+            BRAIN_INIT_TEST_REAL_MV="$REAL_MV" \
+            BRAIN_INIT_TEST_MV_COUNT="$TMP/appear-fail-mv-count" \
+            BRAIN_INIT_TEST_FAIL_MV_CALLS="2" \
+            BRAIN_INIT_TEST_APPEAR_ON_CALL="2" \
+            BRAIN_INIT_TEST_APPEARING_TARGET="$APPEAR_FAIL_VAULT/.brain/runtime/brain_runtime" \
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$APPEAR_FAIL_VAULT" 2>&1
+          )"
+          APPEAR_FAIL_STATUS=$?
+          set -e
+
+          [ "$APPEAR_FAIL_STATUS" -ne 0 ] || { echo "FAIL: target-appearance install failure was ignored"; exit 1; }
+          grep -qi 'previous runtime preserved at' <<<"$APPEAR_FAIL_OUTPUT" || { printf '%s\n' "$APPEAR_FAIL_OUTPUT"; exit 1; }
+          find "$APPEAR_FAIL_VAULT/.brain/runtime" -name old-runtime.txt -type f -print -quit |
+            grep -q . || { echo "FAIL: target-appearance failure deleted previous runtime backup"; exit 1; }
+
+          NEST_VAULT="$TMP/nest-vault"
+          mkdir -p \
+            "$NEST_VAULT/wiki" \
+            "$NEST_VAULT/.claude/hooks" \
+            "$NEST_VAULT/.claude/agents" \
+            "$NEST_VAULT/.claude/skills" \
+            "$NEST_VAULT/templates/schemas" \
+            "$NEST_VAULT/Templates/Bases" \
+            "$NEST_VAULT/config" \
+            "$NEST_VAULT/.brain/runtime/brain_runtime"
+          printf '%s\n' '# Legacy log' > "$NEST_VAULT/wiki/log.md"
+          printf '%s\n' 'old runtime' \
+            > "$NEST_VAULT/.brain/runtime/brain_runtime/old-runtime.txt"
+
+          set +e
+          NEST_OUTPUT="$(
+            PATH="$TMP/bin:$PATH" \
+            BRAIN_INIT_TEST_REAL_MV="$REAL_MV" \
+            BRAIN_INIT_TEST_MV_COUNT="$TMP/nest-mv-count" \
+            BRAIN_INIT_TEST_FAIL_MV_CALLS="" \
+            BRAIN_INIT_TEST_APPEAR_ON_CALL="2" \
+            BRAIN_INIT_TEST_APPEARING_TARGET="$NEST_VAULT/.brain/runtime/brain_runtime" \
+            bash skills/brain-init/scripts/brain-init.sh \
+              --upgrade-harness "$NEST_VAULT" 2>&1
+          )"
+          NEST_STATUS=$?
+          set -e
+
+          [ "$NEST_STATUS" -ne 0 ] || { echo "FAIL: nested runtime replacement was accepted"; exit 1; }
+          grep -qi 'previous runtime preserved at' <<<"$NEST_OUTPUT" || { printf '%s\n' "$NEST_OUTPUT"; exit 1; }
+          find "$NEST_VAULT/.brain/runtime" -name old-runtime.txt -type f -print -quit |
+            grep -q . || { echo "FAIL: nested replacement deleted previous runtime backup"; exit 1; }
+          [ ! -d "$NEST_VAULT/.brain/runtime/.brain-runtime-install.lock" ] || { echo "FAIL: nested replacement left active lock"; exit 1; }
+
+          echo "OK: failed rollback preserves the previous runtime backup"
           rm -rf "$TMP"

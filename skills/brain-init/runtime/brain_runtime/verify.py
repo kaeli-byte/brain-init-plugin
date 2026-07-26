@@ -6,7 +6,7 @@ from typing import Any, Callable
 from .budget import record_budget_metric
 from .contracts import ArtifactRef, CheckResult, VerificationReport
 from .run import _timestamp, load_manifest, run_dir_for, run_lock, save_manifest
-from .trace import TraceEvent, append_event
+from .trace import TraceEvent, append_event, read_json_nofollow
 
 
 VerificationAdapter = Callable[
@@ -110,6 +110,8 @@ def merge_semantic_report(
     run_dir = run_dir_for(vault_root, run_id)
     with run_lock(vault_root, run_id):
         manifest = load_manifest(vault_root, run_id)
+        if manifest["status"] != "running":
+            raise ValueError(f"run is already completed: {run_id}")
         calls = manifest["metrics"]["semantic_verifier_calls"]
         limit = manifest["budget"]["max_semantic_verifier_calls"]
         if calls >= limit:
@@ -127,8 +129,7 @@ def merge_semantic_report(
             ))
             return None
 
-        with (run_dir / "verification.json").open(encoding="utf-8") as report_file:
-            existing = json.load(report_file)
+        existing = read_json_nofollow(run_dir / "verification.json")
         deterministic_and_prior = [
             CheckResult(**item) for item in existing["checks"]
         ]
@@ -166,50 +167,52 @@ def verify_run(
     adapter: VerificationAdapter,
 ) -> VerificationReport:
     vault_root = vault.resolve()
-    run_dir = run_dir_for(vault_root, run_id)
-    manifest = load_manifest(vault_root, run_id)
-    operation = manifest["operation"]
-    append_event(run_dir, TraceEvent(
-        ts=_timestamp(),
-        kind="verify.start",
-        operation=operation,
-        run_id=run_id,
-        label="verification started",
-        data={},
-    ))
-
-    with (run_dir / "artifacts.json").open(encoding="utf-8") as artifacts_file:
-        payload = json.load(artifacts_file)
-    artifacts = [ArtifactRef(**item) for item in payload["artifacts"]]
-    checks = adapter(vault_root, run_dir, artifacts)
-
-    for check in checks:
+    with run_lock(vault_root, run_id):
+        run_dir = run_dir_for(vault_root, run_id)
+        manifest = load_manifest(vault_root, run_id)
+        if manifest["status"] != "running":
+            raise ValueError(f"run is already completed: {run_id}")
+        operation = manifest["operation"]
         append_event(run_dir, TraceEvent(
             ts=_timestamp(),
-            kind="verify.check",
+            kind="verify.start",
             operation=operation,
             run_id=run_id,
-            label=check.id,
-            data={
-                "id": check.id,
-                "passed": check.passed,
-                "severity": check.severity,
-            },
+            label="verification started",
+            data={},
         ))
 
-    report = _build_report(checks)
-    _write_report(run_dir, report)
+        payload = read_json_nofollow(run_dir / "artifacts.json")
+        artifacts = [ArtifactRef(**item) for item in payload["artifacts"]]
+        checks = adapter(vault_root, run_dir, artifacts)
 
-    append_event(run_dir, TraceEvent(
-        ts=_timestamp(),
-        kind="verify.finish",
-        operation=operation,
-        run_id=run_id,
-        label="verification finished",
-        data={
-            "accepted": report.accepted,
-            "critical": len(report.failures),
-            "warning": len(report.warnings),
-        },
-    ))
-    return report
+        for check in checks:
+            append_event(run_dir, TraceEvent(
+                ts=_timestamp(),
+                kind="verify.check",
+                operation=operation,
+                run_id=run_id,
+                label=check.id,
+                data={
+                    "id": check.id,
+                    "passed": check.passed,
+                    "severity": check.severity,
+                },
+            ))
+
+        report = _build_report(checks)
+        _write_report(run_dir, report)
+
+        append_event(run_dir, TraceEvent(
+            ts=_timestamp(),
+            kind="verify.finish",
+            operation=operation,
+            run_id=run_id,
+            label="verification finished",
+            data={
+                "accepted": report.accepted,
+                "critical": len(report.failures),
+                "warning": len(report.warnings),
+            },
+        ))
+        return report

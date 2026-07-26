@@ -14,7 +14,6 @@ from .run import (
     load_manifest,
     plan_run,
     record_event,
-    run_dir_for,
 )
 from .verify import merge_semantic_report, verify_run
 
@@ -149,14 +148,7 @@ def _semantic(args: argparse.Namespace) -> None:
 
 
 def _finish(args: argparse.Namespace) -> None:
-    verification_path = (
-        run_dir_for(args.vault.resolve(), args.run_id) / "verification.json"
-    )
-    shadow_verdict = None
-    if verification_path.is_file():
-        payload = _json_file(str(verification_path))
-        shadow_verdict = payload["accepted"]
-    finish_run(args.vault, args.run_id, shadow_verdict)
+    finish_run(args.vault, args.run_id)
 
 
 _COMMANDS = {
