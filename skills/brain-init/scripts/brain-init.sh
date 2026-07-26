@@ -174,6 +174,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         OBSIDIAN_SRC="$_early_plugin_root/skills/brain-init/assets/obsidian"
         BUNDLES_SRC="$_early_plugin_root/skills/brain-init/bundles"
         DOMAIN_TEMPLATES_SRC="$_early_plugin_root/skills/brain-init/templates"
+        RUNTIME_SRC="$_early_plugin_root/skills/brain-init/runtime"
         echo "  Template source: $_early_plugin_root (brain-init plugin)"
     else
         SCHEMAS_SRC="$TEMPLATE_SOURCE/templates/schemas"
@@ -185,6 +186,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         OBSIDIAN_SRC="$TEMPLATE_SOURCE/.obsidian"
         BUNDLES_SRC="$TEMPLATE_SOURCE/.claude/skills"
         DOMAIN_TEMPLATES_SRC="$TEMPLATE_SOURCE/.claude/skills/brain-init/templates"
+        RUNTIME_SRC="$TEMPLATE_SOURCE/.brain/runtime"
         echo "  Template source: $TEMPLATE_SOURCE (legacy)"
     fi
 
@@ -213,6 +215,17 @@ if [ "$UPGRADE_HARNESS" = true ]; then
             AGENT_UPDATED=$((AGENT_UPDATED + 1))
         done
         echo "  Agent definitions: $AGENT_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Replace vendor-owned runtime code without touching run or evaluation state
+    if [ -d "$RUNTIME_SRC/brain_runtime" ]; then
+        mkdir -p "$VAULT_PATH/.brain/runtime"
+        rm -rf "$VAULT_PATH/.brain/runtime/brain_runtime"
+        cp -R "$RUNTIME_SRC/brain_runtime" "$VAULT_PATH/.brain/runtime/brain_runtime"
+        find "$VAULT_PATH/.brain/runtime" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+        echo "  brain runtime: updated (shadow mode)"; UPGRADED=$((UPGRADED + 1))
+    else
+        echo "  WARNING: brain runtime source not found; capture will run without shadow instrumentation."
     fi
 
     # Update flat second-brain skills (7 skills in subdirectories)
@@ -416,6 +429,7 @@ if [ "$TEMPLATE_IS_PLUGIN" = true ]; then
     OBSIDIAN_SRC="$PLUGIN_ROOT/skills/brain-init/assets/obsidian"
     BUNDLES_SRC="$PLUGIN_ROOT/skills/brain-init/bundles"
     DOMAIN_TEMPLATES_SRC="$PLUGIN_ROOT/skills/brain-init/templates"
+    RUNTIME_SRC="$PLUGIN_ROOT/skills/brain-init/runtime"
 else
     # Legacy mode: paths relative to deep-tech-wiki clone
     SCHEMAS_SRC="$TEMPLATE_SOURCE/templates/schemas"
@@ -427,6 +441,7 @@ else
     OBSIDIAN_SRC="$TEMPLATE_SOURCE/.obsidian"
     BUNDLES_SRC="$TEMPLATE_SOURCE/.claude/skills"
     DOMAIN_TEMPLATES_SRC="$TEMPLATE_SOURCE/.claude/skills/brain-init/templates"
+    RUNTIME_SRC="$TEMPLATE_SOURCE/.brain/runtime"
 fi
 
 # Check target
@@ -508,6 +523,9 @@ if [ "$BARE_MODE" = false ]; then
   mkdir -p "$VAULT_PATH/config"
   mkdir -p "$VAULT_PATH/.claude/agents"
   mkdir -p "$VAULT_PATH/.claude/hooks"
+  mkdir -p "$VAULT_PATH/.brain/runtime"
+  mkdir -p "$VAULT_PATH/.brain/runs"
+  mkdir -p "$VAULT_PATH/.brain/evals"
 fi
 
 WIKI_DIRS=$(find "$VAULT_PATH/wiki" -type d | wc -l | tr -d ' ')
@@ -528,6 +546,9 @@ cat > "$VAULT_PATH/.gitignore" << 'GITIGNORE'
 # qmd refresh tracking
 .qmd-last-refresh
 
+# Brain runtime generated execution traces
+/.brain/runs/
+
 # Secrets & tokens
 .env
 .envrc
@@ -544,6 +565,9 @@ raw/
 
 # IDE planning history — not agent-operational
 .idea/plans/
+
+# Runtime execution history — inspect explicitly, never preload
+.brain/runs/
 
 # Obsidian workspace config — not needed by agent
 .obsidian/
@@ -695,6 +719,16 @@ if [ -d "$AGENTS_SRC" ]; then
   done
 fi
 echo "  Agent definitions: $AGENT_DEFS copied"
+
+# Install vendor-owned runtime code without repository tests
+if [ -d "$RUNTIME_SRC/brain_runtime" ]; then
+  rm -rf "$VAULT_PATH/.brain/runtime/brain_runtime"
+  cp -R "$RUNTIME_SRC/brain_runtime" "$VAULT_PATH/.brain/runtime/brain_runtime"
+  find "$VAULT_PATH/.brain/runtime" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+  echo "  brain runtime: installed (shadow mode)"
+else
+  echo "  WARNING: brain runtime source not found; capture will run without shadow instrumentation."
+fi
 
 # Copy flat second-brain skills (7 skills in subdirectories)
 SECOND_BRAIN_SRC="$BUNDLES_SRC/second-brain"

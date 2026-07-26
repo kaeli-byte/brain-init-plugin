@@ -228,6 +228,12 @@ jobs:
             --no-git --no-qmd --no-obsidian --no-supporting-skills
           echo ""
 
+          [ -f "$TMP/test-full/.brain/runtime/brain_runtime/cli.py" ] || { echo "FAIL: brain runtime missing"; exit 1; }
+          [ -d "$TMP/test-full/.brain/runs" ] || { echo "FAIL: .brain/runs missing"; exit 1; }
+          [ -d "$TMP/test-full/.brain/evals" ] || { echo "FAIL: .brain/evals missing"; exit 1; }
+          grep -q '^/.brain/runs/' "$TMP/test-full/.gitignore" || { echo "FAIL: runtime runs are not gitignored"; exit 1; }
+          PYTHONPATH="$TMP/test-full/.brain/runtime" python3 -c 'import brain_runtime; print(brain_runtime.__version__)'
+
           echo "=== Validate the scaffold ==="
           bash skills/brain-init/scripts/validate-vault.sh "$TMP/test-full"
           echo ""
@@ -303,6 +309,7 @@ jobs:
           [ -d "$TMP/test-bare/wiki/claims" ] || { echo "FAIL: wiki/claims missing"; exit 1; }
           [ -f "$TMP/test-bare/.gitignore" ] || { echo "FAIL: .gitignore missing"; exit 1; }
           [ ! -f "$TMP/test-bare/CLAUDE.md" ] || { echo "FAIL: bare mode should not create CLAUDE.md"; exit 1; }
+          [ ! -d "$TMP/test-bare/.brain/runtime" ] || { echo "FAIL: bare mode installed runtime"; exit 1; }
 
           echo "OK: bare scaffold verified (no harness files)"
           rm -rf "$TMP"
@@ -336,8 +343,15 @@ jobs:
             --domain energy \
             --no-git --no-qmd --no-obsidian --no-supporting-skills
 
+          mkdir -p "$TMP/test-vault/.brain/runs/preserve-me" "$TMP/test-vault/.brain/evals"
+          echo keep > "$TMP/test-vault/.brain/runs/preserve-me/marker.txt"
+          echo labels > "$TMP/test-vault/.brain/evals/human-labels.jsonl"
+
           bash skills/brain-init/scripts/brain-init.sh \
             --upgrade-harness "$TMP/test-vault"
+          [ -f "$TMP/test-vault/.brain/runs/preserve-me/marker.txt" ] || { echo "FAIL: upgrade deleted run history"; exit 1; }
+          [ -f "$TMP/test-vault/.brain/evals/human-labels.jsonl" ] || { echo "FAIL: upgrade deleted eval labels"; exit 1; }
+          PYTHONPATH="$TMP/test-vault/.brain/runtime" python3 -c 'import brain_runtime'
           echo "OK: upgrade harness ran without error"
 
           rm -rf "$TMP"

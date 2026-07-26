@@ -247,7 +247,24 @@ done
 echo "    $SKILL_OK passed, $SKILL_FAIL failed"
 
 # ═══════════════════════════════════════════════════════════════
-# 7. qmd Health
+# 7. Brain Runtime
+# ═══════════════════════════════════════════════════════════════
+echo ""
+echo "── Brain Runtime ──"
+
+[ -d "$VAULT_PATH/.brain/runs" ] && pass ".brain/runs/" || warn ".brain/runs/ — MISSING"
+[ -d "$VAULT_PATH/.brain/evals" ] && pass ".brain/evals/" || warn ".brain/evals/ — MISSING"
+[ -f "$VAULT_PATH/.brain/runtime/brain_runtime/cli.py" ] && \
+  pass "brain runtime code present" || warn "brain runtime code — MISSING"
+
+if PYTHONPATH="$VAULT_PATH/.brain/runtime" python3 -c 'import brain_runtime; import brain_runtime.cli' 2>/dev/null; then
+  pass "brain runtime imports"
+else
+  warn "brain runtime import failed — capture will run without shadow instrumentation"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 8. qmd Health
 # ═══════════════════════════════════════════════════════════════
 echo ""
 echo "── qmd Health ──"
@@ -270,7 +287,7 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 8. Wiki & Root Integrity
+# 9. Wiki & Root Integrity
 # ═══════════════════════════════════════════════════════════════
 echo ""
 echo "── Wiki & Root Integrity ──"
@@ -295,7 +312,7 @@ if [ -f "$VAULT_PATH/wiki/index.md" ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 9. External Dependencies
+# 10. External Dependencies
 # ═══════════════════════════════════════════════════════════════
 echo ""
 echo "── External Dependencies ──"
@@ -379,7 +396,7 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 10. Git State
+# 11. Git State
 # ═══════════════════════════════════════════════════════════════
 echo ""
 echo "── Git State ──"
