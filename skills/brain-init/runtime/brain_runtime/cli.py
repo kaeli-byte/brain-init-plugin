@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from .adapters.capture import capture_checks
+from .adapters import verification_adapter_for
 from .budget import FanoutRequest
 from .contracts import BudgetSpec, RunSpec, VerificationReport
 from .run import (
@@ -131,11 +131,8 @@ def _summary(run_id: str, report: VerificationReport) -> str:
 
 def _verify(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.vault, args.run_id)
-    if manifest["operation"] != "capture":
-        raise ValueError(
-            f"unsupported verification operation: {manifest['operation']}"
-        )
-    report = verify_run(args.vault, args.run_id, capture_checks)
+    adapter = verification_adapter_for(manifest["operation"])
+    report = verify_run(args.vault, args.run_id, adapter)
     print(_summary(args.run_id, report))
 
 

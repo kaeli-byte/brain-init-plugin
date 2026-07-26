@@ -201,6 +201,31 @@ class CaptureVerifyTests(unittest.TestCase):
                 ],
             )
 
+    def test_oversized_declaration_does_not_partially_replace_artifact_state(self):
+        run_id = self._create_run()
+        run_dir = run_dir_for(self.vault, run_id)
+        declare_artifacts(self.vault, run_id, self.paths)
+        artifacts_before = (run_dir / "artifacts.json").read_bytes()
+        events_before = (run_dir / "events.jsonl").read_bytes()
+        oversized_paths = []
+        directory = self.vault / "wiki" / "analyses"
+        directory.mkdir(parents=True, exist_ok=True)
+        for index in range(60):
+            artifact = directory / (
+                f"analysis-{index:03d}-" + ("x" * 150) + ".md"
+            )
+            artifact.write_text("---\nlast_reviewed: 2026-07-26\n---\n")
+            oversized_paths.append(artifact.relative_to(self.vault).as_posix())
+
+        with self.assertRaisesRegex(ValueError, "trace event exceeds"):
+            declare_artifacts(self.vault, run_id, oversized_paths)
+
+        self.assertEqual(
+            (run_dir / "artifacts.json").read_bytes(),
+            artifacts_before,
+        )
+        self.assertEqual((run_dir / "events.jsonl").read_bytes(), events_before)
+
     def test_valid_capture_is_accepted(self):
         report = self._verify()
 

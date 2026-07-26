@@ -34,7 +34,7 @@ def _forbidden_keys_in(value: Any) -> set[str]:
     return set()
 
 
-def append_event(run_dir: Path, event: TraceEvent) -> None:
+def validate_event(event: TraceEvent) -> bytes:
     forbidden_keys = _forbidden_keys_in(event.data)
     if forbidden_keys:
         names = ", ".join(sorted(forbidden_keys))
@@ -43,7 +43,11 @@ def append_event(run_dir: Path, event: TraceEvent) -> None:
     encoded = json.dumps(asdict(event), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     if len(encoded) > MAX_EVENT_BYTES:
         raise ValueError(f"trace event exceeds {MAX_EVENT_BYTES} bytes")
+    return encoded
 
+
+def append_event(run_dir: Path, event: TraceEvent) -> None:
+    encoded = validate_event(event)
     with (run_dir / "events.jsonl").open("ab") as events_file:
         events_file.write(encoded + b"\n")
 

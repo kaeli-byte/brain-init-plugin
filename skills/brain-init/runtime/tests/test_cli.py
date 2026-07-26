@@ -303,6 +303,48 @@ class CliTests(unittest.TestCase):
             },
         )
 
+    def test_adapter_boundary_resolves_capture_and_rejects_unknown_operation(self):
+        from brain_runtime import adapters
+        from brain_runtime.adapters.capture import capture_checks
+
+        resolver = getattr(adapters, "verification_adapter_for", None)
+        self.assertIsNotNone(resolver)
+        self.assertIs(resolver("capture"), capture_checks)
+        with self.assertRaisesRegex(ValueError, "unsupported verification operation"):
+            resolver("unknown-operation")
+
+    def test_generic_cli_has_no_capture_specific_adapter_dependency(self):
+        cli_source = (
+            RUNTIME_ROOT / "brain_runtime" / "cli.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("adapters.capture", cli_source)
+        self.assertNotIn("capture_checks", cli_source)
+        self.assertNotIn('manifest["operation"] != "capture"', cli_source)
+
+    def test_verify_reports_unknown_operation_as_runtime_input_error(self):
+        start = self._run(
+            "start",
+            "--vault",
+            self.vault,
+            "--operation",
+            "unknown-operation",
+            "--mode",
+            "shadow",
+        )
+
+        result = self._run(
+            "verify",
+            "--vault",
+            self.vault,
+            "--run-id",
+            start.stdout.strip(),
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported verification operation", result.stderr)
+
     def test_start_accepts_multiple_inputs_after_one_input_flag(self):
         second_input = self.vault / "raw/annual-reports/acme-2024.pdf"
         second_input.write_bytes(b"fixture-pdf-2024")

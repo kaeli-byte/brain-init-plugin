@@ -10,7 +10,7 @@ from typing import Any, Iterator
 
 from .budget import FanoutRequest, advise_fanout, record_budget_metric
 from .contracts import ArtifactRef, BudgetSpec, RunSpec
-from .trace import TraceEvent, append_event
+from .trace import TraceEvent, append_event, validate_event
 
 
 RUNTIME_VERSION = "0.1.0"
@@ -270,14 +270,8 @@ def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[Artifa
             sha256=sha256_file(resolved),
         ))
 
-    run_dir = run_dir_for(vault_root, run_id)
-    _write_json(
-        run_dir / "artifacts.json",
-        {"artifacts": [artifact.to_dict() for artifact in artifacts]},
-    )
-
     manifest = load_manifest(vault_root, run_id)
-    append_event(run_dir, TraceEvent(
+    event = TraceEvent(
         ts=_timestamp(),
         kind="artifact.declare",
         operation=manifest["operation"],
@@ -287,5 +281,13 @@ def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[Artifa
             "count": len(artifacts),
             "paths": [artifact.path for artifact in artifacts],
         },
-    ))
+    )
+    validate_event(event)
+
+    run_dir = run_dir_for(vault_root, run_id)
+    _write_json(
+        run_dir / "artifacts.json",
+        {"artifacts": [artifact.to_dict() for artifact in artifacts]},
+    )
+    append_event(run_dir, event)
     return artifacts
