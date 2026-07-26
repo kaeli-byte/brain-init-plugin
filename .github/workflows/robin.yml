@@ -34,7 +34,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Check Robin secrets
+        id: robin-secrets
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_BASE_URL" ] && [ -n "$LLM_MODEL" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Robin skipped because required LLM secrets are unavailable."
+          fi
+
       - name: Robin
+        if: steps.robin-secrets.outputs.available == 'true'
         uses: antongulin/robin@f9c7fa0e1c186bb081f812aa708d15e7ace1355c
         with:
           github-token: ${{ github.token }}
