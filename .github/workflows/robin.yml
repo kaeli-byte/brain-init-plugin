@@ -12,10 +12,35 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: robin-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   review:
-    uses: antongulin/robin/.github/workflows/review.yml@main
-    secrets:
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+    if: |
+      github.event_name == 'pull_request' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) &&
+        (
+          startsWith(github.event.comment.body, '/review') ||
+          startsWith(github.event.comment.body, '/robin') ||
+          startsWith(github.event.comment.body, '/summary') ||
+          startsWith(github.event.comment.body, '/help')
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Robin
+        uses: antongulin/robin@f9c7fa0e1c186bb081f812aa708d15e7ace1355c
+        with:
+          github-token: ${{ github.token }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-base-url: ${{ secrets.LLM_BASE_URL }}
+          model: ${{ secrets.LLM_MODEL }}
+          fail-on-high: "false"
+          request-changes: "false"
+          min-command-permission: write
