@@ -46,7 +46,7 @@ skill health, the Brain Runtime, qmd health, wiki/root integrity, external
 dependencies, and git state. The validator reports granular pass, failure, and
 warning totals.
 
-```
+```text
 /brain-init:brain-init --validate ~/brain-semiconductors
 → Validation Complete
   Passed:   <checks passed>
@@ -72,7 +72,8 @@ When the runtime is installed, capture uses shadow instrumentation by default:
 /second-brain-capture raw/annual-reports/acme-2025.pdf
 
 # explicitly disable shadow instrumentation for a session
-BRAIN_RUNTIME_MODE=off
+export BRAIN_RUNTIME_MODE=off
+claude
 ```
 
 An instrumented capture can write these operational records under its run

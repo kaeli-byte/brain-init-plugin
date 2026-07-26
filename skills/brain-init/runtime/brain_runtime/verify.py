@@ -129,7 +129,20 @@ def merge_semantic_report(
             ))
             return None
 
-        existing = read_json_nofollow(run_dir / "verification.json")
+        verification_path = run_dir / "verification.json"
+        try:
+            existing = read_json_nofollow(verification_path)
+        except (FileNotFoundError, json.JSONDecodeError) as error:
+            raise ValueError(
+                "deterministic verification must complete before semantic verification"
+            ) from error
+        if (
+            not isinstance(existing, dict)
+            or not isinstance(existing.get("checks"), list)
+        ):
+            raise ValueError(
+                "deterministic verification must complete before semantic verification"
+            )
         deterministic_and_prior = [
             CheckResult(**item) for item in existing["checks"]
         ]

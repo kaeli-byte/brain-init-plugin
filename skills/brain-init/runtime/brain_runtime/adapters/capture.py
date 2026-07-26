@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 
 from ..contracts import ArtifactRef, CheckResult
+from ..run import sha256_file
 from ..trace import read_events, read_json_nofollow
 
 
@@ -360,12 +361,19 @@ def capture_checks(
     declared = {artifact.path for artifact in artifacts}
     checks: list[CheckResult] = []
     kinds = {"claim": 0, "source": 0, "company": 0}
+    seen_claim_ids: set[str] = set()
+    seen_source_ids: set[str] = set()
 
     for artifact in artifacts:
         if artifact.kind in kinds:
             kinds[artifact.kind] += 1
         path = _confined_path(vault_root, artifact.path)
         exists = path is not None and path.is_file()
+        digest_valid = (
+            exists
+            and bool(SHA256.fullmatch(artifact.sha256))
+            and sha256_file(path) == artifact.sha256
+        )
         checks.extend([
             _check(
                 "artifact.exists",
@@ -375,9 +383,12 @@ def capture_checks(
             ),
             _check(
                 "artifact.sha256",
-                bool(SHA256.fullmatch(artifact.sha256)),
+                digest_valid,
                 artifact=artifact.path,
-                message="artifact SHA-256 must be 64 lowercase hexadecimal characters",
+                message=(
+                    "artifact SHA-256 must be 64 lowercase hexadecimal "
+                    "characters and match the current file bytes"
+                ),
             ),
         ])
         if not exists or not artifact.path.startswith("wiki/"):
@@ -398,8 +409,28 @@ def capture_checks(
             artifact=artifact.path,
         ))
         if artifact.kind == "claim":
+            claim_id = data.get("claim_id")
+            if isinstance(claim_id, str) and claim_id:
+                duplicate = claim_id in seen_claim_ids
+                checks.append(_check(
+                    "claim.id_unique",
+                    not duplicate,
+                    artifact=artifact.path,
+                    message=f"duplicate claim_id: {claim_id}",
+                ))
+                seen_claim_ids.add(claim_id)
             checks.extend(_claim_checks(vault_root, artifact, data, declared))
         elif artifact.kind == "source":
+            source_id = data.get("source_id")
+            if isinstance(source_id, str) and source_id:
+                duplicate = source_id in seen_source_ids
+                checks.append(_check(
+                    "source.id_unique",
+                    not duplicate,
+                    artifact=artifact.path,
+                    message=f"duplicate source_id: {source_id}",
+                ))
+                seen_source_ids.add(source_id)
             checks.extend(_source_checks(
                 vault_root,
                 artifact,

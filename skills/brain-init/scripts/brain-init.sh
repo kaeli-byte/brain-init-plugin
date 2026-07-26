@@ -98,11 +98,11 @@ migrate_runtime_ownership() {
     append_ignore_rule \
         "$vault_root/.gitignore" \
         "# Brain runtime generated execution traces" \
-        "/.brain/runs/"
+        "/.brain/runs/" || return 1
     append_ignore_rule \
         "$vault_root/.claudeignore" \
         "# Runtime execution history — inspect explicitly, never preload" \
-        ".brain/runs/"
+        ".brain/runs/" || return 1
 }
 
 replace_runtime_code() (
@@ -154,8 +154,15 @@ replace_runtime_code() (
         return 1
     fi
     cleanup_runtime_install_lock() {
+        rm -f "$install_lock/owner"
         rmdir "$install_lock" 2>/dev/null || true
     }
+    if ! printf 'pid=%s\ncreated_at=%s\n' "$$" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        > "$install_lock/owner"; then
+        cleanup_runtime_install_lock
+        echo "ERROR: Could not record runtime replacement lock ownership." >&2
+        return 1
+    fi
     trap cleanup_runtime_install_lock EXIT
     trap 'cleanup_runtime_install_lock; exit 1' HUP INT TERM
 

@@ -25,7 +25,7 @@ def advise_fanout(request: FanoutRequest, budget: BudgetSpec) -> FanoutDecision:
             request.slices,
             1,
         )
-    workers = min(n, budget.max_workers)
+    workers = max(1, min(n, budget.max_workers))
     return FanoutDecision(
         "fanout",
         "parallel slices plus context pressure or high value justify fan-out",

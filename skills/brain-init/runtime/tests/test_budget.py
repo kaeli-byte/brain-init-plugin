@@ -36,6 +36,23 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(decision.mode, "fanout")
         self.assertEqual(decision.max_workers, 2)
 
+    def test_fanout_defensively_never_returns_zero_workers(self):
+        req = FanoutRequest(
+            slices=[{"id": "business"}, {"id": "mda"}],
+            parallelizable=True,
+            exceeds_one_context=True,
+            high_value=True,
+        )
+        budget = object.__new__(BudgetSpec)
+        object.__setattr__(budget, "max_workers", 0)
+        object.__setattr__(budget, "max_attempts", 3)
+        object.__setattr__(budget, "max_semantic_verifier_calls", 1)
+
+        decision = advise_fanout(req, budget)
+
+        self.assertEqual(decision.mode, "fanout")
+        self.assertEqual(decision.max_workers, 1)
+
     def test_parallel_low_value_work_that_fits_context_stays_single(self):
         req = FanoutRequest(
             slices=[{"id": "business"}, {"id": "mda"}],

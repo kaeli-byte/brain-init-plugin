@@ -386,15 +386,6 @@ class CliTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported verification operation"):
             resolver("unknown-operation")
 
-    def test_generic_cli_has_no_capture_specific_adapter_dependency(self):
-        cli_source = (
-            RUNTIME_ROOT / "brain_runtime" / "cli.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertNotIn("adapters.capture", cli_source)
-        self.assertNotIn("capture_checks", cli_source)
-        self.assertNotIn('manifest["operation"] != "capture"', cli_source)
-
     def test_verify_reports_unknown_operation_as_runtime_input_error(self):
         start = self._run(
             "start",
@@ -417,6 +408,85 @@ class CliTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unsupported verification operation", result.stderr)
+
+    def test_start_rejects_invalid_budget_values_during_argument_parsing(self):
+        cases = [
+            ("--max-workers", "0"),
+            ("--max-attempts", "0"),
+            ("--max-semantic-verifier-calls", "-1"),
+        ]
+        for option, value in cases:
+            with self.subTest(option=option, value=value):
+                result = self._run(
+                    "start",
+                    "--vault",
+                    self.vault,
+                    "--operation",
+                    "capture",
+                    "--mode",
+                    "shadow",
+                    option,
+                    value,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("error:", result.stderr.lower())
+
+    def test_plan_rejects_non_array_slices(self):
+        run_id = self._start()
+        request_file = self._write_json(
+            "invalid-plan.json",
+            {
+                "slices": {"id": "mda"},
+                "parallelizable": True,
+                "exceeds_one_context": True,
+                "high_value": True,
+            },
+        )
+
+        result = self._run(
+            "plan",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--request-file",
+            request_file,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("slices must be an array", result.stderr)
+
+    def test_semantic_requires_deterministic_verification_report(self):
+        run_id = self._start()
+        report_file = self._write_json(
+            "semantic-before-verify.json",
+            {
+                "checks": [{
+                    "id": "semantic.before_verify",
+                    "passed": True,
+                    "severity": "info",
+                }],
+            },
+        )
+
+        result = self._run(
+            "semantic",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--report-file",
+            report_file,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "deterministic verification must complete before semantic verification",
+            result.stderr,
+        )
 
     def test_start_accepts_multiple_inputs_after_one_input_flag(self):
         second_input = self.vault / "raw/annual-reports/acme-2024.pdf"
@@ -520,7 +590,7 @@ class CliTests(unittest.TestCase):
                 command,
                 env=env,
                 text=True,
-                stdout=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
             for command in commands

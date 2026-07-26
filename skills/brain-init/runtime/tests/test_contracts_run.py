@@ -75,6 +75,23 @@ class ContractRunTests(unittest.TestCase):
             self.assertRegex(manifest["inputs"][0]["sha256"], r"^[0-9a-f]{64}$")
             self.assertEqual(read_events(run_dir)[0].kind, "run.start")
 
+    def test_create_run_rejects_missing_input_file(self):
+        with TemporaryDirectory() as td:
+            vault = Path(td)
+            spec = RunSpec(
+                "capture",
+                "shadow",
+                ["raw/missing.pdf"],
+                None,
+                BudgetSpec(),
+            )
+
+            with self.assertRaisesRegex(
+                FileNotFoundError,
+                "input reference does not exist",
+            ):
+                create_run(vault, spec)
+
     def test_create_run_rejects_absolute_input_reference(self):
         with TemporaryDirectory() as td:
             owned_root = Path(td)
@@ -203,7 +220,7 @@ class ContractRunTests(unittest.TestCase):
 
             writer = threading.Thread(target=write_event)
             writer.start()
-            completed_without_reader = finished.wait(timeout=0.1)
+            completed_without_reader = finished.wait(timeout=1.0)
             reader_descriptor = None
             if not completed_without_reader:
                 reader_descriptor = os.open(events_path, os.O_RDONLY | os.O_NONBLOCK)

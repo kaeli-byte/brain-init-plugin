@@ -166,6 +166,65 @@ class CaptureVerifyTests(unittest.TestCase):
         self.assertEqual(event.data, {"count": 3, "paths": self.paths})
         self.assertNotIn("Acme generated", json.dumps(event.data))
 
+    def test_artifact_sha256_rejects_file_changed_after_declaration(self):
+        self._add_second_claim()
+        run_id = self._create_run()
+        declare_artifacts(self.vault, run_id, self.paths)
+        changed = self.vault / self.paths[0]
+        changed.write_text(
+            changed.read_text(encoding="utf-8") + "\nchanged after declaration\n",
+            encoding="utf-8",
+        )
+
+        report = verify_run(self.vault, run_id, capture_checks)
+
+        failed = [
+            check for check in self._checks(report, "artifact.sha256")
+            if check.artifact == self.paths[0] and not check.passed
+        ]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0].severity, "critical")
+        self.assertFalse(report.accepted)
+
+    def test_duplicate_claim_ids_are_rejected(self):
+        duplicate = self.vault / "wiki/claims/claim-duplicate-id.md"
+        duplicate.write_text(
+            (self.vault / self.paths[0]).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        self.paths.append(duplicate.relative_to(self.vault).as_posix())
+        run_id = self._create_run()
+        declare_artifacts(self.vault, run_id, self.paths)
+
+        report = verify_run(self.vault, run_id, capture_checks)
+
+        failed = [
+            check for check in self._checks(report, "claim.id_unique")
+            if not check.passed
+        ]
+        self.assertEqual([check.artifact for check in failed], [self.paths[-1]])
+        self.assertFalse(report.accepted)
+
+    def test_duplicate_source_ids_are_rejected(self):
+        duplicate = self.vault / "wiki/sources/src-duplicate-id.md"
+        duplicate.write_text(
+            (self.vault / self.paths[1]).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        self.paths.append(duplicate.relative_to(self.vault).as_posix())
+        self._add_second_claim()
+        run_id = self._create_run()
+        declare_artifacts(self.vault, run_id, self.paths)
+
+        report = verify_run(self.vault, run_id, capture_checks)
+
+        failed = [
+            check for check in self._checks(report, "source.id_unique")
+            if not check.passed
+        ]
+        self.assertEqual([check.artifact for check in failed], [self.paths[-1]])
+        self.assertFalse(report.accepted)
+
     def test_declare_artifacts_rejects_parent_traversal(self):
         outside = self.vault.parent / "outside.md"
         outside.write_text("outside")
@@ -350,7 +409,7 @@ class CaptureVerifyTests(unittest.TestCase):
         self.assertEqual(check.severity, "critical")
         self.assertFalse(report.accepted)
 
-    def test_fanout_plan_marks_annual_report_as_long(self):
+    def test_annual_report_metadata_marks_input_as_long(self):
         report = self._verify(
             profile="custom-profile",
             metadata={"source_type": "annual-report"},

@@ -100,11 +100,14 @@ def create_run(vault: Path, spec: RunSpec) -> str:
             vault_root,
             f"input reference escapes the vault: {input_ref}",
         )
-        if resolved.is_file():
-            inputs.append({
-                "path": resolved.relative_to(vault_root).as_posix(),
-                "sha256": sha256_file(resolved),
-            })
+        if not resolved.is_file():
+            raise FileNotFoundError(
+                f"input reference does not exist or is not a file: {input_ref}"
+            )
+        inputs.append({
+            "path": resolved.relative_to(vault_root).as_posix(),
+            "sha256": sha256_file(resolved),
+        })
     run_dir.mkdir(parents=True, exist_ok=False)
     started_at = _timestamp()
     manifest = {

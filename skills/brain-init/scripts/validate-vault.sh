@@ -257,7 +257,9 @@ echo "── Brain Runtime ──"
 [ -f "$VAULT_PATH/.brain/runtime/brain_runtime/cli.py" ] && \
   pass "brain runtime code present" || warn "brain runtime code — MISSING"
 
-if PYTHONPATH="$VAULT_PATH/.brain/runtime" python3 -c 'import brain_runtime; import brain_runtime.cli' 2>/dev/null; then
+if PYTHONPATH="$VAULT_PATH/.brain/runtime" python3 -c \
+  'import sys; from pathlib import Path; import brain_runtime; import brain_runtime.cli; Path(brain_runtime.__file__).resolve().relative_to(Path(sys.argv[1]).resolve())' \
+  "$VAULT_PATH/.brain/runtime" 2>/dev/null; then
   pass "brain runtime imports"
 else
   warn "brain runtime import failed — capture will run without shadow instrumentation"

@@ -27,6 +27,20 @@ def _vault_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vault", type=Path, required=True)
 
 
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return parsed
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="brain_runtime.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -37,9 +51,13 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--mode", choices=["shadow"], required=True)
     start.add_argument("--profile")
     start.add_argument("--input", nargs="+", default=[])
-    start.add_argument("--max-workers", type=int, default=4)
-    start.add_argument("--max-attempts", type=int, default=3)
-    start.add_argument("--max-semantic-verifier-calls", type=int, default=1)
+    start.add_argument("--max-workers", type=_positive_int, default=4)
+    start.add_argument("--max-attempts", type=_positive_int, default=3)
+    start.add_argument(
+        "--max-semantic-verifier-calls",
+        type=_non_negative_int,
+        default=1,
+    )
 
     plan = commands.add_parser("plan")
     _vault_argument(plan)
@@ -96,6 +114,8 @@ def _plan(args: argparse.Namespace) -> None:
     payload = _json_file(args.request_file)
     if not isinstance(payload, dict):
         raise ValueError("request file must contain a JSON object")
+    if not isinstance(payload.get("slices"), list):
+        raise ValueError("request file slices must be an array")
     request = FanoutRequest(**payload)
     plan_run(args.vault, args.run_id, request)
 

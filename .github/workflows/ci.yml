@@ -361,8 +361,15 @@ jobs:
           [ "$VERIFY_STATUS" -eq 0 ] || { echo "$VERIFY_OUTPUT"; echo "FAIL: shadow verify blocked capture"; exit 1; }
           grep -q 'Runtime shadow: REJECT' <<<"$VERIFY_OUTPUT" || { echo "$VERIFY_OUTPUT"; echo "FAIL: expected shadow rejection"; exit 1; }
           [ -f "$VAULT/wiki/claims/invalid-claim.md" ] || { echo "FAIL: shadow rejection removed canonical artifact"; exit 1; }
-          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["accepted"] is False' \
-            "$VAULT/.brain/runs/$RUN_ID/verification.json"
+          python3 - "$VAULT/.brain/runs/$RUN_ID/verification.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              report = json.load(handle)
+          if report.get("accepted") is not False:
+              raise SystemExit("FAIL: verification report did not record accepted=false")
+          PY
 
           echo "OK: shadow rejection preserved the invalid canonical artifact"
           rm -rf "$TMP"
@@ -689,6 +696,11 @@ jobs:
           printf '%s\n' \
             '#!/usr/bin/env bash' \
             'set -euo pipefail' \
+            'runtime_move=0' \
+            'for argument in "$@"; do' \
+            '  case "$argument" in *".brain/runtime"*) runtime_move=1 ;; esac' \
+            'done' \
+            'if [ "$runtime_move" -eq 0 ]; then exec "$BRAIN_INIT_TEST_REAL_MV" "$@"; fi' \
             'count=0' \
             'if [ -f "$BRAIN_INIT_TEST_MV_COUNT" ]; then IFS= read -r count < "$BRAIN_INIT_TEST_MV_COUNT"; fi' \
             'count=$((count + 1))' \
@@ -752,6 +764,7 @@ jobs:
           grep -qi 'previous runtime preserved at' <<<"$APPEAR_FAIL_OUTPUT" || { printf '%s\n' "$APPEAR_FAIL_OUTPUT"; exit 1; }
           find "$APPEAR_FAIL_VAULT/.brain/runtime" -name old-runtime.txt -type f -print -quit |
             grep -q . || { echo "FAIL: target-appearance failure deleted previous runtime backup"; exit 1; }
+          [ ! -d "$APPEAR_FAIL_VAULT/.brain/runtime/.brain-runtime-install.lock" ] || { echo "FAIL: target-appearance failure left active lock"; exit 1; }
 
           NEST_VAULT="$TMP/nest-vault"
           mkdir -p \
