@@ -137,49 +137,55 @@ def _evidence_checks(
         message="linked source page is missing or undeclared",
     ))
 
-    locator_passed = True
-    locator_warning = False
-    locator_message = ""
+    critical_messages: list[str] = []
+    converted_unavailable = False
     entries = evidence if isinstance(evidence, list) else [evidence]
     for entry in entries:
         if not isinstance(entry, dict) or not entry.get("passage"):
             continue
         entry_links = _links(entry.get("source"), "src-")
         if not entry_links:
-            locator_passed = False
-            locator_message = "structured evidence source link is missing"
+            critical_messages.append("structured evidence source link is missing")
             continue
         source_relative = f"wiki/sources/{entry_links[0]}.md"
         if source_relative not in declared:
-            locator_passed = False
-            locator_message = "linked source page is missing or undeclared"
+            critical_messages.append("linked source page is missing or undeclared")
             continue
         try:
             source_data, _ = read_frontmatter(vault / source_relative)
         except (OSError, ValueError, yaml.YAMLError):
-            locator_passed = False
-            locator_message = "linked source frontmatter is unavailable"
+            critical_messages.append("linked source frontmatter is unavailable")
             continue
         raw_path = source_data.get("raw_path")
         raw_file = _confined_path(vault, raw_path) if isinstance(raw_path, str) else None
         converted = raw_file.with_suffix(".md") if raw_file is not None else None
         if converted is None or not converted.is_file():
-            locator_passed = False
-            locator_warning = True
-            locator_message = "converted markdown unavailable; locator not mechanically checked"
+            converted_unavailable = True
             continue
         if _normalized(str(entry["passage"])) not in _normalized(
             converted.read_text(encoding="utf-8")
         ):
-            locator_passed = False
-            locator_warning = False
-            locator_message = "evidence passage not found in converted markdown"
+            critical_messages.append(
+                "evidence passage not found in converted markdown"
+            )
+    locator_passed = not critical_messages and not converted_unavailable
+    if critical_messages:
+        locator_message = "; ".join(dict.fromkeys(critical_messages))
+        locator_severity = "critical"
+    elif converted_unavailable:
+        locator_message = (
+            "converted markdown unavailable; locator not mechanically checked"
+        )
+        locator_severity = "warning"
+    else:
+        locator_message = ""
+        locator_severity = "critical"
     checks.append(_check(
         "evidence.locator_resolves",
         locator_passed,
         artifact=artifact_path,
         message=locator_message,
-        severity="warning" if locator_warning else "critical",
+        severity=locator_severity,
     ))
     return checks
 
@@ -295,9 +301,20 @@ def _workflow_checks(vault: Path, run_dir: Path) -> list[CheckResult]:
         "exceeds_one_context",
         plan.get("exceeds_one_context"),
     )
+    normalized_inputs = [
+        re.sub(r"[^a-z0-9]+", "-", item.get("path", "").lower()).strip("-")
+        for item in inputs
+    ]
     annual_report_input = (
-        source_type in {"annual-report", "10k-filing"}
-        or any("annual-report" in item.get("path", "") for item in inputs)
+        source_type in {
+            "annual-report", "10k-filing", "10-k-filing", "sec-filing",
+        }
+        or any(
+            "annual-report" in path
+            or "sec-filing" in path
+            or re.search(r"(?:^|-)10-?k(?:-|$)", path)
+            for path in normalized_inputs
+        )
     )
     long_capture = annual_report_input and exceeds_one_context is not False
     profile_valid = not long_capture or manifest.get("profile") in RECOGNIZED_LONG_PROFILES

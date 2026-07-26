@@ -143,6 +143,7 @@ def _artifact_kind(relative_path: Path) -> str:
 def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[ArtifactRef]:
     vault_root = vault.resolve()
     artifacts: list[ArtifactRef] = []
+    declared_paths: set[str] = set()
     for path_text in paths:
         requested = Path(path_text)
         if requested.is_absolute():
@@ -152,11 +153,15 @@ def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[Artifa
             relative = resolved.relative_to(vault_root)
         except ValueError as error:
             raise ValueError(f"artifact path escapes vault: {path_text}") from error
+        normalized_path = relative.as_posix()
+        if normalized_path in declared_paths:
+            raise ValueError(f"duplicate artifact path: {normalized_path}")
         if not resolved.is_file():
-            raise FileNotFoundError(f"artifact file does not exist: {relative.as_posix()}")
+            raise FileNotFoundError(f"artifact file does not exist: {normalized_path}")
+        declared_paths.add(normalized_path)
         artifacts.append(ArtifactRef(
             kind=_artifact_kind(relative),
-            path=relative.as_posix(),
+            path=normalized_path,
             sha256=sha256_file(resolved),
         ))
 

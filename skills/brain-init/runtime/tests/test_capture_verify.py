@@ -65,13 +65,17 @@ class CaptureVerifyTests(unittest.TestCase):
         qmd_passed=True,
         qmd_event=True,
         metadata=None,
+        input_refs=None,
     ):
+        input_refs = input_refs or [
+            "raw/annual-reports/acme-2025-annual-report.pdf",
+        ]
         run_id = create_run(
             self.vault,
             RunSpec(
                 "capture",
                 "shadow",
-                ["raw/annual-reports/acme-2025-annual-report.pdf"],
+                input_refs,
                 profile,
                 BudgetSpec(),
                 metadata=metadata or {
@@ -109,6 +113,41 @@ class CaptureVerifyTests(unittest.TestCase):
         run_id = self._create_run(**run_options)
         declare_artifacts(self.vault, run_id, self.paths)
         return verify_run(self.vault, run_id, capture_checks)
+
+    def _add_mixed_locator_source(self, unavailable_first):
+        source = self.vault / "wiki/sources/src-acme-unavailable.md"
+        source.write_text(
+            (FIXTURES / "valid-source.md").read_text()
+            .replace(
+                "source_id: src-acme-2025-annual-report",
+                "source_id: src-acme-unavailable",
+            )
+            .replace(
+                "raw/annual-reports/acme-2025-annual-report.pdf",
+                "raw/annual-reports/acme-unavailable.pdf",
+            )
+        )
+        self.paths.append(source.relative_to(self.vault).as_posix())
+        unavailable = (
+            "  - source: \"[[src-acme-unavailable]]\"\n"
+            "    passage: \"A locator that cannot be mechanically checked.\"\n"
+            "    context: \"Unavailable conversion\"\n"
+        )
+        disproven = (
+            "  - source: \"[[src-acme-2025-annual-report]]\"\n"
+            "    passage: \"A passage that is not present.\"\n"
+            "    context: \"Converted markdown exists\"\n"
+        )
+        entries = unavailable + disproven if unavailable_first else disproven + unavailable
+        claim = self.vault / self.paths[0]
+        claim.write_text(
+            claim.read_text().replace(
+                "  - source: \"[[src-acme-2025-annual-report]]\"\n"
+                "    passage: \"Revenue for 2025 was RMB 10 billion.\"\n"
+                "    context: \"Page 12, Results of Operations\"\n",
+                entries,
+            )
+        )
 
     @staticmethod
     def _checks(report, check_id):
@@ -148,6 +187,19 @@ class CaptureVerifyTests(unittest.TestCase):
         )
 
         self.assertEqual(refs[0].kind, "technology")
+
+    def test_declare_artifacts_rejects_duplicate_normalized_paths(self):
+        run_id = self._create_run()
+
+        with self.assertRaisesRegex(ValueError, "duplicate artifact path"):
+            declare_artifacts(
+                self.vault,
+                run_id,
+                [
+                    "wiki/claims/claim-acme-revenue.md",
+                    "wiki/claims/../claims/claim-acme-revenue.md",
+                ],
+            )
 
     def test_valid_capture_is_accepted(self):
         report = self._verify()
@@ -191,6 +243,32 @@ class CaptureVerifyTests(unittest.TestCase):
         self.assertFalse(report.accepted)
         self.assertTrue(any(not check.passed for check in self._checks(report, "evidence.locator_resolves")))
 
+    def test_critical_locator_failure_survives_later_unavailable_warning(self):
+        self._add_mixed_locator_source(unavailable_first=False)
+
+        report = self._verify()
+
+        failed = [
+            check for check in self._checks(report, "evidence.locator_resolves")
+            if not check.passed
+        ]
+        self.assertTrue(failed)
+        self.assertTrue(all(check.severity == "critical" for check in failed))
+        self.assertFalse(report.accepted)
+
+    def test_critical_locator_failure_survives_earlier_unavailable_warning(self):
+        self._add_mixed_locator_source(unavailable_first=True)
+
+        report = self._verify()
+
+        failed = [
+            check for check in self._checks(report, "evidence.locator_resolves")
+            if not check.passed
+        ]
+        self.assertTrue(failed)
+        self.assertTrue(all(check.severity == "critical" for check in failed))
+        self.assertFalse(report.accepted)
+
     def test_two_claim_minimum_is_a_critical_output_contract_check(self):
         run_id = self._create_run()
         declare_artifacts(self.vault, run_id, self.paths)
@@ -226,6 +304,37 @@ class CaptureVerifyTests(unittest.TestCase):
 
         check = self._checks(report, "capture.profile_recognized")[0]
         self.assertFalse(check.passed)
+        self.assertFalse(report.accepted)
+
+    def test_sec_10k_path_accepts_sec_filing_profile_without_source_metadata(self):
+        sec_input = self.vault / "raw/sec-filings/acme-10-k.pdf"
+        sec_input.parent.mkdir(parents=True)
+        sec_input.write_bytes(b"fixture-10-k")
+
+        report = self._verify(
+            profile="sec-filing-v1",
+            metadata={"exceeds_one_context": True},
+            input_refs=["raw/sec-filings/acme-10-k.pdf"],
+        )
+
+        check = self._checks(report, "capture.profile_recognized")[0]
+        self.assertTrue(check.passed)
+        self.assertTrue(report.accepted)
+
+    def test_sec_10k_path_rejects_unrecognized_profile_without_source_metadata(self):
+        sec_input = self.vault / "raw/sec-filings/acme-10-k.pdf"
+        sec_input.parent.mkdir(parents=True)
+        sec_input.write_bytes(b"fixture-10-k")
+
+        report = self._verify(
+            profile="custom-profile",
+            metadata={"exceeds_one_context": True},
+            input_refs=["raw/sec-filings/acme-10-k.pdf"],
+        )
+
+        check = self._checks(report, "capture.profile_recognized")[0]
+        self.assertFalse(check.passed)
+        self.assertEqual(check.severity, "critical")
         self.assertFalse(report.accepted)
 
     def test_missing_qmd_completion_is_warning_not_rejection(self):
