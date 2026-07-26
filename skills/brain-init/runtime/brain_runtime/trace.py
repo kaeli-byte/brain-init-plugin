@@ -26,7 +26,7 @@ def _forbidden_keys_in(value: Any) -> set[str]:
         for child in value.values():
             keys.update(_forbidden_keys_in(child))
         return keys
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         keys: set[str] = set()
         for child in value:
             keys.update(_forbidden_keys_in(child))

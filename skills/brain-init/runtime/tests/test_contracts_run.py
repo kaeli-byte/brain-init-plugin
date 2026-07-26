@@ -85,6 +85,20 @@ class ContractRunTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "transcript"):
                 append_event(Path(td), event)
 
+    def test_append_event_rejects_forbidden_keys_nested_in_tuple(self):
+        with TemporaryDirectory() as td:
+            event = TraceEvent(
+                ts="2026-07-26T00:00:00Z",
+                kind="worker.finish",
+                operation="capture",
+                run_id="20260726T000000Z-capture-deadbeef",
+                label="worker result",
+                data={"result": ({"transcript": "must not persist"},)},
+            )
+
+            with self.assertRaisesRegex(ValueError, "transcript"):
+                append_event(Path(td), event)
+
 
 if __name__ == "__main__":
     unittest.main()
