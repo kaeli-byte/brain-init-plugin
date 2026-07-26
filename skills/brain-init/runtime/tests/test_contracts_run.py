@@ -5,7 +5,7 @@ import unittest
 
 from brain_runtime.contracts import BudgetSpec, RetryFeedback, RunSpec
 from brain_runtime.run import create_run, finish_run
-from brain_runtime.trace import read_events
+from brain_runtime.trace import TraceEvent, append_event, read_events
 
 
 class ContractRunTests(unittest.TestCase):
@@ -70,6 +70,20 @@ class ContractRunTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "completed")
             self.assertFalse(manifest["shadow_verdict"])
             self.assertEqual(read_events(vault / ".brain/runs" / run_id)[-1].kind, "run.finish")
+
+    def test_append_event_rejects_forbidden_keys_nested_in_payload(self):
+        with TemporaryDirectory() as td:
+            event = TraceEvent(
+                ts="2026-07-26T00:00:00Z",
+                kind="worker.finish",
+                operation="capture",
+                run_id="20260726T000000Z-capture-deadbeef",
+                label="worker result",
+                data={"result": [{"details": {"transcript": "must not persist"}}]},
+            )
+
+            with self.assertRaisesRegex(ValueError, "transcript"):
+                append_event(Path(td), event)
 
 
 if __name__ == "__main__":

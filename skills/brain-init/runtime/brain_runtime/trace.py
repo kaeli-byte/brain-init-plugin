@@ -20,8 +20,22 @@ class TraceEvent:
     data: dict[str, Any] = field(default_factory=dict)
 
 
+def _forbidden_keys_in(value: Any) -> set[str]:
+    if isinstance(value, dict):
+        keys = FORBIDDEN_TRACE_KEYS.intersection(value)
+        for child in value.values():
+            keys.update(_forbidden_keys_in(child))
+        return keys
+    if isinstance(value, list):
+        keys: set[str] = set()
+        for child in value:
+            keys.update(_forbidden_keys_in(child))
+        return keys
+    return set()
+
+
 def append_event(run_dir: Path, event: TraceEvent) -> None:
-    forbidden_keys = FORBIDDEN_TRACE_KEYS.intersection(event.data)
+    forbidden_keys = _forbidden_keys_in(event.data)
     if forbidden_keys:
         names = ", ".join(sorted(forbidden_keys))
         raise ValueError(f"forbidden trace data keys: {names}")
