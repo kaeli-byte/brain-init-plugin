@@ -40,13 +40,18 @@ Initialize a new brain vault.
 
 ### `/brain-init:brain-init --validate <path>`
 
-Health-check an existing vault. Runs 9 checks: directory structure, schema YAML,
-types.json coverage, hook integrity, agent definitions, skill health, qmd health,
-external dependencies, and git state.
+Health-check an existing vault. Runs 11 validation sections covering directory
+structure, schema YAML, types.json coverage, hook integrity, agent definitions,
+skill health, the Brain Runtime, qmd health, wiki/root integrity, external
+dependencies, and git state. The validator reports granular pass, failure, and
+warning totals.
 
-```
+```text
 /brain-init:brain-init --validate ~/brain-semiconductors
-→ PASS: 9/9 checks passed. Vault is healthy.
+→ Validation Complete
+  Passed:   <checks passed>
+  Failed:   0
+  Warnings: <environment-dependent warnings>
 ```
 
 ### `/brain-init:brain-init --upgrade-harness <path>`
@@ -57,6 +62,33 @@ Update harness files from the plugin's bundled assets while preserving all wiki 
 /brain-init:brain-init --upgrade-harness ~/brain-semiconductors
 → Updated 23 harness files. Wiki content preserved (142 pages).
 ```
+
+## Capture runtime (shadow mode)
+
+When the runtime is installed, capture uses shadow instrumentation by default:
+
+```bash
+# default when the runtime is installed
+/second-brain-capture raw/annual-reports/acme-2025.pdf
+
+# explicitly disable shadow instrumentation for a session
+export BRAIN_RUNTIME_MODE=off
+claude
+```
+
+An instrumented capture can write these operational records under its run
+directory:
+
+```text
+.brain/runs/<run-id>/manifest.json
+.brain/runs/<run-id>/events.jsonl
+.brain/runs/<run-id>/plan.json          # optional when planning is used
+.brain/runs/<run-id>/artifacts.json
+.brain/runs/<run-id>/verification.json
+```
+
+These files are operational records, not canonical wiki knowledge. A shadow
+`REJECT` is advisory and does not alter, remove, or roll back capture results.
 
 ## Domain Presets
 

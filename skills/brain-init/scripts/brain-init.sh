@@ -31,7 +31,223 @@ find_plugin_root() {
     return 1
 }
 
+ensure_runtime_ownership_layout() {
+    local requested_vault="$1"
+    local vault_root
+    local brain_root
+    local ownership_path
+    local canonical_path
+
+    vault_root="$(cd "$requested_vault" 2>/dev/null && pwd -P)" || {
+        echo "ERROR: Cannot resolve vault path: $requested_vault" >&2
+        return 1
+    }
+    brain_root="$vault_root/.brain"
+    for ownership_path in \
+        "$brain_root" \
+        "$brain_root/runtime" \
+        "$brain_root/runs" \
+        "$brain_root/evals"; do
+        if [ -L "$ownership_path" ]; then
+            echo "ERROR: Refusing symlinked runtime ownership path: $ownership_path" >&2
+            return 1
+        fi
+        if [ -e "$ownership_path" ] && [ ! -d "$ownership_path" ]; then
+            echo "ERROR: Runtime ownership path is not a directory: $ownership_path" >&2
+            return 1
+        fi
+        mkdir -p "$ownership_path"
+        canonical_path="$(cd "$ownership_path" 2>/dev/null && pwd -P)" || {
+            echo "ERROR: Cannot resolve runtime ownership path: $ownership_path" >&2
+            return 1
+        }
+        case "$canonical_path" in
+            "$brain_root"|"$brain_root"/*) ;;
+            *)
+                echo "ERROR: Runtime ownership path escapes the vault: $ownership_path" >&2
+                return 1
+                ;;
+        esac
+    done
+    printf '%s\n' "$vault_root"
+}
+
+append_ignore_rule() {
+    local ignore_file="$1"
+    local comment="$2"
+    local rule="$3"
+
+    if [ -L "$ignore_file" ]; then
+        echo "ERROR: Refusing symlinked runtime ownership file: $ignore_file" >&2
+        return 1
+    fi
+    if [ -e "$ignore_file" ] && [ ! -f "$ignore_file" ]; then
+        echo "ERROR: Runtime ownership file is not a regular file: $ignore_file" >&2
+        return 1
+    fi
+    if grep -qxF "$rule" "$ignore_file" 2>/dev/null; then
+        return 0
+    fi
+    [ ! -s "$ignore_file" ] || printf '\n' >> "$ignore_file"
+    printf '%s\n%s\n' "$comment" "$rule" >> "$ignore_file"
+}
+
+migrate_runtime_ownership() {
+    local vault_root
+    vault_root="$(ensure_runtime_ownership_layout "$1")" || return 1
+    append_ignore_rule \
+        "$vault_root/.gitignore" \
+        "# Brain runtime generated execution traces" \
+        "/.brain/runs/" || return 1
+    append_ignore_rule \
+        "$vault_root/.claudeignore" \
+        "# Runtime execution history — inspect explicitly, never preload" \
+        ".brain/runs/" || return 1
+}
+
+replace_runtime_code() (
+    local requested_vault="$1"
+    local runtime_source="$2"
+    local vault_root
+    local runtime_root
+    local source_package
+    local source_link
+    local target
+    local install_lock
+    local stage_root
+    local staged
+    local stage_marker
+    local backup
+
+    vault_root="$(ensure_runtime_ownership_layout "$requested_vault")" || return 1
+    runtime_root="$vault_root/.brain/runtime"
+    source_package="$runtime_source/brain_runtime"
+    target="$runtime_root/brain_runtime"
+
+    if [ -L "$runtime_source" ] || [ -L "$source_package" ]; then
+        echo "ERROR: Refusing symlinked runtime source: $source_package" >&2
+        return 1
+    fi
+    if [ ! -d "$source_package" ]; then
+        echo "ERROR: Runtime source package is missing: $source_package" >&2
+        return 1
+    fi
+    source_link="$(find "$source_package" -type l -print 2>/dev/null)"
+    if [ -n "$source_link" ]; then
+        echo "ERROR: Refusing symlinked runtime source content: $source_link" >&2
+        return 1
+    fi
+
+    if [ -L "$target" ]; then
+        echo "ERROR: Refusing symlinked runtime ownership path: $target" >&2
+        return 1
+    fi
+    if [ -e "$target" ] && [ ! -d "$target" ]; then
+        echo "ERROR: Runtime package target is not a directory: $target" >&2
+        return 1
+    fi
+
+    install_lock="$runtime_root/.brain-runtime-install.lock"
+    if ! mkdir "$install_lock" 2>/dev/null; then
+        echo "ERROR: Runtime replacement is already in progress: $install_lock" >&2
+        echo "ERROR: If this lock is stale, remove it only after confirming no installer is active." >&2
+        return 1
+    fi
+    cleanup_runtime_install_lock() {
+        rm -f "$install_lock/owner"
+        rmdir "$install_lock" 2>/dev/null || true
+    }
+    if ! printf 'pid=%s\ncreated_at=%s\n' "$$" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        > "$install_lock/owner"; then
+        cleanup_runtime_install_lock
+        echo "ERROR: Could not record runtime replacement lock ownership." >&2
+        return 1
+    fi
+    trap cleanup_runtime_install_lock EXIT
+    trap 'cleanup_runtime_install_lock; exit 1' HUP INT TERM
+
+    stage_root="$(mktemp -d "$runtime_root/.brain-runtime-stage.XXXXXX")" || {
+        echo "ERROR: Could not create a staged runtime directory." >&2
+        return 1
+    }
+    staged="$stage_root/brain_runtime"
+    if ! cp -R "$source_package" "$staged"; then
+        rm -rf "$stage_root"
+        echo "ERROR: Could not stage brain runtime code." >&2
+        return 1
+    fi
+    find "$staged" -type d -name '__pycache__' -prune \
+        -exec rm -rf {} + 2>/dev/null || true
+    source_link="$(find "$staged" -type l -print 2>/dev/null)"
+    if [ -L "$staged" ] || [ -n "$source_link" ] || [ ! -f "$staged/__init__.py" ]; then
+        rm -rf "$stage_root"
+        echo "ERROR: Staged brain runtime package is incomplete." >&2
+        return 1
+    fi
+    stage_marker=".brain-runtime-install-id"
+    if ! printf '%s\n' "$stage_root" > "$staged/$stage_marker"; then
+        rm -rf "$stage_root"
+        echo "ERROR: Could not mark the staged brain runtime package." >&2
+        return 1
+    fi
+
+    backup=""
+    if [ -d "$target" ]; then
+        backup="$stage_root/previous-brain_runtime"
+        if ! mv "$target" "$backup"; then
+            rm -rf "$stage_root"
+            echo "ERROR: Could not stage the previous brain runtime for replacement." >&2
+            return 1
+        fi
+    fi
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        echo "ERROR: Runtime target appeared during replacement." >&2
+        if [ -n "$backup" ]; then
+            echo "ERROR: Previous runtime preserved at: $backup" >&2
+        fi
+        return 1
+    fi
+    if ! mv "$staged" "$target"; then
+        if [ -n "$backup" ] && [ -d "$backup" ]; then
+            if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+                if mv "$backup" "$target" 2>/dev/null; then
+                    rm -rf "$stage_root"
+                    echo "ERROR: Could not install staged brain runtime code; previous runtime restored." >&2
+                    return 1
+                fi
+            fi
+            echo "ERROR: Previous runtime preserved at: $backup" >&2
+            return 1
+        fi
+        rm -rf "$stage_root"
+        echo "ERROR: Could not install staged brain runtime code." >&2
+        return 1
+    fi
+    source_link="$(find "$target" -type l -print 2>/dev/null)"
+    if \
+        [ -L "$target" ] ||
+        [ -n "$source_link" ] ||
+        [ ! -f "$target/__init__.py" ] ||
+        [ ! -f "$target/$stage_marker" ] ||
+        ! grep -qxF "$stage_root" "$target/$stage_marker"; then
+        echo "ERROR: Installed brain runtime package failed validation." >&2
+        if [ -n "$backup" ] && [ -d "$backup" ]; then
+            echo "ERROR: Previous runtime preserved at: $backup" >&2
+        fi
+        return 1
+    fi
+    if ! rm -f "$target/$stage_marker"; then
+        echo "ERROR: Could not finalize the installed brain runtime package." >&2
+        if [ -n "$backup" ] && [ -d "$backup" ]; then
+            echo "ERROR: Previous runtime preserved at: $backup" >&2
+        fi
+        return 1
+    fi
+    rm -rf "$stage_root"
+)
+
 # ── Defaults ──────────────────────────────────────────────────
+BRAIN_INIT_VERSION="1.2.0"
 DOMAIN="${BRAIN_DOMAIN:-industrial-intelligence}"
 DOMAIN_CUSTOM=""
 VAULT_PATH=""
@@ -114,7 +330,7 @@ fi
 # ── --validate mode ───────────────────────────────────────────
 if [ "$VALIDATE_MODE" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  brain-init v1.0.0 — Validate mode"
+    echo "  brain-init v${BRAIN_INIT_VERSION} — Validate mode"
     echo "  Vault:   $VAULT_PATH"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
@@ -132,7 +348,7 @@ fi
 # ── --upgrade-harness mode ────────────────────────────────────
 if [ "$UPGRADE_HARNESS" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  brain-init v1.0.0 — Upgrade harness mode"
+    echo "  brain-init v${BRAIN_INIT_VERSION} — Upgrade harness mode"
     echo "  Vault:   $VAULT_PATH"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
@@ -174,6 +390,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         OBSIDIAN_SRC="$_early_plugin_root/skills/brain-init/assets/obsidian"
         BUNDLES_SRC="$_early_plugin_root/skills/brain-init/bundles"
         DOMAIN_TEMPLATES_SRC="$_early_plugin_root/skills/brain-init/templates"
+        RUNTIME_SRC="$_early_plugin_root/skills/brain-init/runtime"
         echo "  Template source: $_early_plugin_root (brain-init plugin)"
     else
         SCHEMAS_SRC="$TEMPLATE_SOURCE/templates/schemas"
@@ -185,10 +402,12 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         OBSIDIAN_SRC="$TEMPLATE_SOURCE/.obsidian"
         BUNDLES_SRC="$TEMPLATE_SOURCE/.claude/skills"
         DOMAIN_TEMPLATES_SRC="$TEMPLATE_SOURCE/.claude/skills/brain-init/templates"
+        RUNTIME_SRC="$TEMPLATE_SOURCE/.brain/runtime"
         echo "  Template source: $TEMPLATE_SOURCE (legacy)"
     fi
 
     UPGRADED=0
+    migrate_runtime_ownership "$VAULT_PATH"
 
     # Update hooks.json (preserve vault path)
     echo ""
@@ -213,6 +432,14 @@ if [ "$UPGRADE_HARNESS" = true ]; then
             AGENT_UPDATED=$((AGENT_UPDATED + 1))
         done
         echo "  Agent definitions: $AGENT_UPDATED updated"; UPGRADED=$((UPGRADED + 1))
+    fi
+
+    # Replace vendor-owned runtime code without touching run or evaluation state
+    if [ -d "$RUNTIME_SRC/brain_runtime" ]; then
+        replace_runtime_code "$VAULT_PATH" "$RUNTIME_SRC"
+        echo "  brain runtime: updated (shadow mode)"; UPGRADED=$((UPGRADED + 1))
+    else
+        echo "  WARNING: brain runtime source not found; capture will run without shadow instrumentation."
     fi
 
     # Update flat second-brain skills (7 skills in subdirectories)
@@ -306,7 +533,7 @@ if [ "$UPGRADE_HARNESS" = true ]; then
     fi
 
     # Append log entry
-    LOG_LINE="## [${TODAY}] brain-init | Harness upgraded | brain-init v1.0.0"
+    LOG_LINE="## [${TODAY}] brain-init | Harness upgraded | brain-init v${BRAIN_INIT_VERSION}"
     if ! grep -qF "$LOG_LINE" "$VAULT_PATH/wiki/log.md" 2>/dev/null; then
         printf "\n%s\n- %d harness components updated from %s\n" "$LOG_LINE" "$UPGRADED" \
             "$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo 'brain-init plugin' || echo "$TEMPLATE_SOURCE")" \
@@ -342,7 +569,7 @@ VAULT_NAME="${VAULT_NAME:-$(basename "$VAULT_PATH")}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  brain-init v1.0.0"
+echo "  brain-init v${BRAIN_INIT_VERSION}"
 echo "  Vault:   $VAULT_PATH"
 echo "  Name:    $VAULT_NAME"
 echo "  Domain:  $DOMAIN"
@@ -386,7 +613,7 @@ else
     if [ -n "$PLUGIN_ROOT" ] && [ -d "$PLUGIN_ROOT/skills/brain-init/assets/schemas" ]; then
         TEMPLATE_SOURCE="$PLUGIN_ROOT"
         TEMPLATE_IS_PLUGIN=true
-        echo "  Template source: $TEMPLATE_SOURCE (brain-init plugin v1.0.0)"
+        echo "  Template source: $TEMPLATE_SOURCE (brain-init plugin v${BRAIN_INIT_VERSION})"
     elif [ -d "$HOME/deep-tech-wiki/templates/schemas" ]; then
         TEMPLATE_SOURCE="$HOME/deep-tech-wiki"
         echo "  Template source: $TEMPLATE_SOURCE (legacy: ~/deep-tech-wiki)"
@@ -416,6 +643,7 @@ if [ "$TEMPLATE_IS_PLUGIN" = true ]; then
     OBSIDIAN_SRC="$PLUGIN_ROOT/skills/brain-init/assets/obsidian"
     BUNDLES_SRC="$PLUGIN_ROOT/skills/brain-init/bundles"
     DOMAIN_TEMPLATES_SRC="$PLUGIN_ROOT/skills/brain-init/templates"
+    RUNTIME_SRC="$PLUGIN_ROOT/skills/brain-init/runtime"
 else
     # Legacy mode: paths relative to deep-tech-wiki clone
     SCHEMAS_SRC="$TEMPLATE_SOURCE/templates/schemas"
@@ -427,6 +655,7 @@ else
     OBSIDIAN_SRC="$TEMPLATE_SOURCE/.obsidian"
     BUNDLES_SRC="$TEMPLATE_SOURCE/.claude/skills"
     DOMAIN_TEMPLATES_SRC="$TEMPLATE_SOURCE/.claude/skills/brain-init/templates"
+    RUNTIME_SRC="$TEMPLATE_SOURCE/.brain/runtime"
 fi
 
 # Check target
@@ -508,6 +737,7 @@ if [ "$BARE_MODE" = false ]; then
   mkdir -p "$VAULT_PATH/config"
   mkdir -p "$VAULT_PATH/.claude/agents"
   mkdir -p "$VAULT_PATH/.claude/hooks"
+  ensure_runtime_ownership_layout "$VAULT_PATH" >/dev/null
 fi
 
 WIKI_DIRS=$(find "$VAULT_PATH/wiki" -type d | wc -l | tr -d ' ')
@@ -528,6 +758,9 @@ cat > "$VAULT_PATH/.gitignore" << 'GITIGNORE'
 # qmd refresh tracking
 .qmd-last-refresh
 
+# Brain runtime generated execution traces
+/.brain/runs/
+
 # Secrets & tokens
 .env
 .envrc
@@ -544,6 +777,9 @@ raw/
 
 # IDE planning history — not agent-operational
 .idea/plans/
+
+# Runtime execution history — inspect explicitly, never preload
+.brain/runs/
 
 # Obsidian workspace config — not needed by agent
 .obsidian/
@@ -619,7 +855,7 @@ INDEXMD
 echo "  Wrote: wiki/index.md"
 
 # Write wiki/log.md
-LOG_SOURCE_DESC="$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo 'brain-init plugin v1.0.0' || echo "$TEMPLATE_SOURCE")"
+LOG_SOURCE_DESC="$([ "$TEMPLATE_IS_PLUGIN" = true ] && echo "brain-init plugin v${BRAIN_INIT_VERSION}" || echo "$TEMPLATE_SOURCE")"
 cat > "$VAULT_PATH/wiki/log.md" << LOGMD
 ---
 tags: [log]
@@ -630,7 +866,7 @@ created: ${TODAY}
 
 Append-only chronological record of all brain operations.
 
-## [${TODAY}] brain-init | Vault created | brain-init v1.0.0
+## [${TODAY}] brain-init | Vault created | brain-init v${BRAIN_INIT_VERSION}
 - Domain: ${DOMAIN}
 - Mode: $([ "$BARE_MODE" = true ] && echo 'bare' || echo 'full')
 - Template: ${LOG_SOURCE_DESC}
@@ -695,6 +931,14 @@ if [ -d "$AGENTS_SRC" ]; then
   done
 fi
 echo "  Agent definitions: $AGENT_DEFS copied"
+
+# Install vendor-owned runtime code without repository tests
+if [ -d "$RUNTIME_SRC/brain_runtime" ]; then
+  replace_runtime_code "$VAULT_PATH" "$RUNTIME_SRC"
+  echo "  brain runtime: installed (shadow mode)"
+else
+  echo "  WARNING: brain runtime source not found; capture will run without shadow instrumentation."
+fi
 
 # Copy flat second-brain skills (7 skills in subdirectories)
 SECOND_BRAIN_SRC="$BUNDLES_SRC/second-brain"

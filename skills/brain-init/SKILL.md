@@ -1,6 +1,6 @@
 ---
 name: brain-init
-version: 1.1.2
+version: 1.2.0
 description: >
   Initialize a new Industrial Intelligence Brain vault. Creates the full harness —
   directory tree, 18 page-type schemas, Obsidian vault config, ECC hooks, agent
@@ -67,13 +67,17 @@ Initialize a new brain vault.
 
 ### `/brain-init:brain-init --validate <vault-path>`
 
-Validate an existing brain vault for correctness. Runs 9 checks: directory structure,
-schema YAML validity, types.json coverage, hook integrity, agent definitions, skill health,
-qmd health, external dependencies, and git state.
+Validate an existing brain vault for correctness. Runs 11 validation sections covering
+directory structure, schema YAML, types.json coverage, hook integrity, agent definitions,
+skill health, the Brain Runtime, qmd health, wiki/root integrity, external dependencies,
+and git state. The validator reports granular pass, failure, and warning totals.
 
-```
+```text
 /brain-init:brain-init --validate ~/brain-semiconductors
-→ PASS: 9/9 checks passed. Vault is healthy.
+→ Validation Complete
+  Passed:   <checks passed>
+  Failed:   0
+  Warnings: <environment-dependent warnings>
 ```
 
 ---
@@ -159,4 +163,5 @@ $PLUGIN_ROOT/
 
 ## Changelog
 
+- v1.2.0 (2026-07-26): Added the shadow-only capture loop-graph runtime, runtime ownership and installer safeguards, and expanded 11-section vault validation.
 - v1.0.0 (2026-07-23): Initial release as self-contained Claude Code plugin. Plugin-aware path resolution with legacy fallback. All scaffolding assets bundled. Obsidian plugins declared but not bundled.
