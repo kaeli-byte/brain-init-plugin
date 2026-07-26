@@ -1,0 +1,10 @@
+{
+  "slices": [
+    {"id":"business","tier":1,"start":100,"end":420},
+    {"id":"mda","tier":1,"start":900,"end":1600},
+    {"id":"segments","tier":1,"start":2200,"end":2700}
+  ],
+  "parallelizable": true,
+  "exceeds_one_context": true,
+  "high_value": true
+}

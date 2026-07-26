@@ -6,7 +6,7 @@ import secrets
 import tempfile
 from typing import Any
 
-from .contracts import RunSpec
+from .contracts import ArtifactRef, RunSpec
 from .trace import TraceEvent, append_event
 
 
@@ -112,3 +112,83 @@ def finish_run(vault: Path, run_id: str, shadow_verdict: bool | None = None) -> 
         label="run completed",
         data={"shadow_verdict": shadow_verdict},
     ))
+
+
+def _artifact_kind(relative_path: Path) -> str:
+    parts = relative_path.parts
+    if len(parts) < 3 or parts[0] != "wiki":
+        return "wiki_page"
+    return {
+        "analyses": "analysis",
+        "applications": "application",
+        "claims": "claim",
+        "companies": "company",
+        "concepts": "concept",
+        "indexes": "index",
+        "industries": "industry",
+        "logs": "log",
+        "markets": "market",
+        "patent-families": "patent-family",
+        "people": "person",
+        "processes": "process",
+        "products": "product",
+        "queries": "query",
+        "regulations": "regulation",
+        "sources": "source",
+        "standards": "standard",
+        "technologies": "technology",
+    }.get(parts[1], "wiki_page")
+
+
+def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[ArtifactRef]:
+    vault_root = vault.resolve()
+    artifacts: list[ArtifactRef] = []
+    for path_text in paths:
+        requested = Path(path_text)
+        if requested.is_absolute():
+            raise ValueError(f"artifact path must be vault-relative: {path_text}")
+        resolved = (vault_root / requested).resolve()
+        try:
+            relative = resolved.relative_to(vault_root)
+        except ValueError as error:
+            raise ValueError(f"artifact path escapes vault: {path_text}") from error
+        if not resolved.is_file():
+            raise FileNotFoundError(f"artifact file does not exist: {relative.as_posix()}")
+        artifacts.append(ArtifactRef(
+            kind=_artifact_kind(relative),
+            path=relative.as_posix(),
+            sha256=sha256_file(resolved),
+        ))
+
+    run_dir = run_dir_for(vault_root, run_id)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=run_dir,
+        prefix=".artifacts-",
+        suffix=".json",
+        delete=False,
+    ) as temporary_file:
+        json.dump(
+            {"artifacts": [artifact.to_dict() for artifact in artifacts]},
+            temporary_file,
+            indent=2,
+            sort_keys=True,
+        )
+        temporary_file.write("\n")
+        temporary_path = Path(temporary_file.name)
+    temporary_path.replace(run_dir / "artifacts.json")
+
+    manifest = load_manifest(vault_root, run_id)
+    append_event(run_dir, TraceEvent(
+        ts=_timestamp(),
+        kind="artifact.declare",
+        operation=manifest["operation"],
+        run_id=run_id,
+        label="artifacts declared",
+        data={
+            "count": len(artifacts),
+            "paths": [artifact.path for artifact in artifacts],
+        },
+    ))
+    return artifacts
