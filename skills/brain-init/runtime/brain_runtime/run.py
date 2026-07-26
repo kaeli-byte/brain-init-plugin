@@ -1,12 +1,15 @@
+from contextlib import contextmanager
 from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
 from pathlib import Path
 import secrets
 import tempfile
-from typing import Any
+from typing import Any, Iterator
 
-from .contracts import ArtifactRef, RunSpec
+from .budget import FanoutRequest, advise_fanout, record_budget_metric
+from .contracts import ArtifactRef, BudgetSpec, RunSpec
 from .trace import TraceEvent, append_event
 
 
@@ -25,11 +28,25 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _safe_component(value: str, label: str) -> str:
+    if not value or value in {".", ".."} or Path(value).name != value:
+        raise ValueError(f"{label} must be a safe path component")
+    return value
+
+
 def run_dir_for(vault: Path, run_id: str) -> Path:
-    return vault / ".brain" / "runs" / run_id
+    safe_run_id = _safe_component(run_id, "run ID")
+    runs_root = (vault.resolve() / ".brain" / "runs").resolve()
+    run_dir = (runs_root / safe_run_id).resolve()
+    try:
+        run_dir.relative_to(runs_root)
+    except ValueError as error:
+        raise ValueError("run ID escapes the vault run directory") from error
+    return run_dir
 
 
 def _run_id(operation: str) -> str:
+    _safe_component(operation, "operation")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{timestamp}-{operation}-{secrets.token_hex(4)}"
 
@@ -95,6 +112,94 @@ def save_manifest(vault: Path, run_id: str, manifest: dict[str, Any]) -> None:
         temporary_file.write("\n")
         temporary_path = Path(temporary_file.name)
     temporary_path.replace(run_dir / "manifest.json")
+
+
+@contextmanager
+def run_lock(vault: Path, run_id: str) -> Iterator[None]:
+    run_dir = run_dir_for(vault, run_id)
+    if not run_dir.is_dir():
+        raise FileNotFoundError(f"run state does not exist: {run_id}")
+    with (run_dir / ".lock").open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.stem}-",
+        suffix=".json",
+        delete=False,
+    ) as temporary_file:
+        json.dump(payload, temporary_file, indent=2, sort_keys=True)
+        temporary_file.write("\n")
+        temporary_path = Path(temporary_file.name)
+    temporary_path.replace(path)
+
+
+def plan_run(vault: Path, run_id: str, request: FanoutRequest) -> dict[str, Any]:
+    vault_root = vault.resolve()
+    manifest = load_manifest(vault_root, run_id)
+    run_dir = run_dir_for(vault_root, run_id)
+    decision = advise_fanout(
+        request,
+        BudgetSpec.from_dict(manifest["budget"]),
+    )
+    payload = {"decision": decision.to_dict()}
+    _write_json(run_dir / "plan.json", payload)
+    append_event(run_dir, TraceEvent(
+        ts=_timestamp(),
+        kind="plan.section_map",
+        operation=manifest["operation"],
+        run_id=run_id,
+        label="section map recorded",
+        data={"slice_count": len(request.slices)},
+    ))
+    append_event(run_dir, TraceEvent(
+        ts=_timestamp(),
+        kind="plan.fanout",
+        operation=manifest["operation"],
+        run_id=run_id,
+        label="fanout advised",
+        data={
+            "mode": decision.mode,
+            "max_workers": decision.max_workers,
+            "reason": decision.reason,
+        },
+    ))
+    return payload
+
+
+def record_event(
+    vault: Path,
+    run_id: str,
+    kind: str,
+    label: str,
+    data: dict[str, Any] | None = None,
+) -> None:
+    vault_root = vault.resolve()
+    with run_lock(vault_root, run_id):
+        manifest = load_manifest(vault_root, run_id)
+        append_event(run_dir_for(vault_root, run_id), TraceEvent(
+            ts=_timestamp(),
+            kind=kind,
+            operation=manifest["operation"],
+            run_id=run_id,
+            label=label,
+            data=data or {},
+        ))
+        updated = manifest
+        if kind == "worker.finish":
+            updated = record_budget_metric(updated, "workers")
+        if label.startswith("attempt."):
+            updated = record_budget_metric(updated, "attempts")
+        if updated is not manifest:
+            save_manifest(vault_root, run_id, updated)
 
 
 def finish_run(vault: Path, run_id: str, shadow_verdict: bool | None = None) -> None:
@@ -166,23 +271,10 @@ def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[Artifa
         ))
 
     run_dir = run_dir_for(vault_root, run_id)
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=run_dir,
-        prefix=".artifacts-",
-        suffix=".json",
-        delete=False,
-    ) as temporary_file:
-        json.dump(
-            {"artifacts": [artifact.to_dict() for artifact in artifacts]},
-            temporary_file,
-            indent=2,
-            sort_keys=True,
-        )
-        temporary_file.write("\n")
-        temporary_path = Path(temporary_file.name)
-    temporary_path.replace(run_dir / "artifacts.json")
+    _write_json(
+        run_dir / "artifacts.json",
+        {"artifacts": [artifact.to_dict() for artifact in artifacts]},
+    )
 
     manifest = load_manifest(vault_root, run_id)
     append_event(run_dir, TraceEvent(
