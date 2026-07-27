@@ -27,6 +27,10 @@ last_reviewed: 2026-07-17                                       # Date last revi
 counter_evidence: []                                            # Sources that contradict this claim (if disputed)
 superseded_by:                                                  # claim-{uuid} of newer claim replacing this one (if outdated)
 
+# Temporal lifecycle (set by reconcile for updating/superseding dispositions)
+valid_from: 2026-01-01                                          # Date this proposition became effective (YYYY-MM-DD, optional)
+valid_to: 2026-12-31                                            # Date this proposition stopped being current (YYYY-MM-DD, optional)
+
 # Entity/technology/industry links
 entities: [entity-apple, entity-tsmc]
 technologies: [technology-3nm, technology-arm-architecture]

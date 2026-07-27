@@ -30,7 +30,16 @@
     "reliability": "text",
     "materiality": "text",
     "key_claims": "multitext",
+    "reconciliation": "text",
     "entities_covered": "multitext",
+
+    "reconciliation_id": "text",
+    "origin": "text",
+    "search_method": "text",
+    "coverage_complete": "checkbox",
+    "candidates": "multitext",
+    "valid_from": "date",
+    "valid_to": "date",
 
     "company_id": "text",
     "legal_name": "text",

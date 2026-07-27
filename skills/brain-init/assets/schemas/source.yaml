@@ -14,7 +14,8 @@ reliability: audited                           # One of: audited | peer-reviewed
 materiality: high                              # One of: high | medium | low — how much this source moves the needle
 
 # Linkage (at least one required per category)
-key_claims: [claim-uuid-1, claim-uuid-2]       # Links to extracted claims
+key_claims: [claim-uuid-1, claim-uuid-2]       # Links to extracted claims (applied result claims only after reconcile)
+reconciliation: "[[reconcile-src-example]]"     # Wikilink to this source's canonical reconciliation record (optional)
 entities_covered: [entity-apple, entity-tsmc]  # Companies, people, etc. covered
 technologies_covered: [technology-3nm]         # Technologies discussed
 industries_covered: [industry-semiconductor]   # Industries relevant

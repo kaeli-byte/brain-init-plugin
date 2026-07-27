@@ -1,0 +1,76 @@
+# Reconciliation Page Schema
+# The canonical record that stages capture candidates and audits their reconciliation.
+# Referenced by: config/page-templates.md
+# Load when: creating or validating a wiki/reconciliations/ page
+#
+# One git-tracked record per source: wiki/reconciliations/reconcile-<source-id>.md
+# The YAML frontmatter is machine-authoritative. The Markdown body is a concise
+# human view, not a second machine-authoritative copy.
+
+# Required fields
+reconciliation_id: reconcile-src-example                    # reconcile-<source-id>
+source: "[[src-example]]"                                   # Wikilink to the source page being reconciled
+origin: capture                                             # One of: capture | legacy — capture = newly staged, legacy = bootstrap audit
+status: staged                                              # One of: staged | pending_review | complete | incomplete
+search_method: qmd                                          # One of: qmd | filesystem | mixed | unavailable
+coverage_complete: true                                     # Boolean; MUST be true before any completed candidate may be classified `new`
+created: 2026-07-27                                         # Date the record was staged (YYYY-MM-DD)
+last_reviewed: 2026-07-27                                   # Date last reviewed (YYYY-MM-DD, update on every edit)
+
+# candidates — bounded candidate package. New capture records target 2-6 material
+# candidates (more than six is a warning); legacy bootstrap records may exceed six
+# and are processed without truncation.
+candidates:
+  - candidate_id: candidate-000000000000                    # Deterministic: first 12 hex of SHA-256(source_id + "\n" + normalized claim_text)
+    claim_text: "Example falsifiable statement."            # The falsifiable proposition
+    source_evidence:
+      - source: "[[src-example]]"                           # Wikilink to source page
+        passage: "Exact supporting passage."                # Verbatim passage or data point
+        context: "Page 1"                                   # Where in the source + surrounding context
+    entities: ["[[company-example]]"]                       # Entity wikilinks the claim bears on
+    disposition:                                            # One of: new | corroborating | updating | contradicting | superseding | irrelevant
+    target_claim:                                           # Required for corroborating/updating/contradicting/superseding; forbidden for new/irrelevant
+    reason:                                                 # Why this disposition was chosen
+    confidence_effect:                                      # One of: increase | decrease | unchanged | not_applicable
+    review_state:                                           # One of: not_required | pending | approved | rejected
+    action_state:                                           # One of: pending | applied | not_applicable | rejected
+    result_claim:                                           # Applied result claim link (new -> new page; corroborating -> target); null otherwise
+    reviewed_by:                                            # e.g. human — set on approved/rejected sensitive decisions
+    reviewed_at:                                            # YYYY-MM-DD of the decision
+    review_note:                                            # Human rationale; non-empty on rejection
+
+# Unclassified candidate fields may be null only while the record is `staged` or
+# `incomplete`. A `complete` or `pending_review` record must give every candidate
+# one of the six final dispositions. Duplicate candidate_ids in one record are invalid.
+#
+# Disposition semantics:
+# - new / corroborating / irrelevant are SAFE (applied automatically).
+# - updating / contradicting / superseding are SENSITIVE (require an inline human
+#   decision before canonical mutation; no action until approved).
+# - rejected sensitive actions: review_state=rejected, action_state=rejected,
+#   reviewed_by=human, reviewed_at set, non-empty review_note, result_claim null,
+#   no canonical claim or entity mutation.
+# - Reconcile never deletes a canonical claim; history is preserved with
+#   valid_from / valid_to and superseded_by links.
+#
+# Required Markdown body headings (human view only):
+# # Reconciliation: <source title>
+# ## Summary
+# ## Pending Review
+# ## Changelog
+
+# ── YAML Safety Rules (see claim.yaml for full reference) ──
+# Rule 1 — COLON-SPACE: Quote values containing `: `.
+# Rule 2 — LEADING > or |: Quote list items starting with `>` or `|`.
+# Rule 3 — INTERNAL QUOTES + TRAILING TEXT: Wrap in single quotes.
+# Rule 4 — NO NESTED LISTS: Use mapping keys between list levels.
+# Rule 5 — YAML RESERVED WORDS: Quote `true`/`false`/`null`/`yes`/`no`/`~` etc.
+# Rule 6 — VERIFY BEFORE SAVE: python3 -c "import yaml; yaml.safe_load(open('path').read().split('---')[1])"
+
+# Key rules:
+# - Every completed candidate has exactly one disposition.
+# - No candidate is classified `new` unless comparator-search coverage is complete.
+# - Every changed wiki page is declared; undeclared changed/added/removed pages are
+#   a critical shadow finding.
+# - Runtime state contains paths, hashes, compact events, and structured results
+#   only — never source bodies, transcripts, or chain-of-thought.
