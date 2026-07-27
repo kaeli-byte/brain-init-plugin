@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import stat
 import tempfile
 from typing import Any, Iterator
 
@@ -374,3 +375,68 @@ def declare_artifacts(vault: Path, run_id: str, paths: list[str]) -> list[Artifa
         )
         append_event(run_dir, event)
         return artifacts
+
+
+def snapshot_tree(vault: Path, run_id: str, root: str) -> dict[str, Any]:
+    vault_root = vault.resolve()
+    with run_lock(vault_root, run_id):
+        manifest = load_manifest(vault_root, run_id)
+        if manifest["status"] != "running":
+            raise ValueError(f"run is already completed: {run_id}")
+
+        requested = Path(root)
+        if requested.is_absolute():
+            raise ValueError(f"snapshot root must be vault-relative: {root}")
+        if ".." in requested.parts:
+            raise ValueError(
+                f"snapshot root must not contain parent traversal: {root}"
+            )
+        normalized_root = requested.as_posix()
+        lexical_root = vault_root / requested
+        if lexical_root.is_symlink():
+            raise ValueError(f"snapshot root is a symlink: {root}")
+        root_path = lexical_root.resolve()
+        _require_beneath(
+            root_path,
+            vault_root,
+            f"snapshot root escapes the vault: {root}",
+        )
+        if not root_path.is_dir():
+            raise ValueError(f"snapshot root is not a directory: {root}")
+
+        entries: list[dict[str, str]] = []
+        for dirpath, dirnames, filenames in os.walk(root_path, followlinks=False):
+            for name in dirnames:
+                candidate = Path(dirpath) / name
+                if candidate.is_symlink():
+                    raise ValueError(
+                        f"snapshot tree contains a symlinked directory: {candidate}"
+                    )
+            for name in filenames:
+                candidate = Path(dirpath) / name
+                if candidate.is_symlink():
+                    raise ValueError(
+                        f"snapshot tree contains a symlinked file: {candidate}"
+                    )
+                if candidate.suffix != ".md":
+                    continue
+                if not stat.S_ISREG(candidate.lstat().st_mode):
+                    raise ValueError(
+                        f"snapshot tree contains a non-regular markdown file: {candidate}"
+                    )
+                relative = candidate.relative_to(vault_root).as_posix()
+                entries.append({"path": relative, "sha256": sha256_file(candidate)})
+        entries.sort(key=lambda item: item["path"])
+
+        payload: dict[str, Any] = {"root": normalized_root, "files": entries}
+        run_dir = run_dir_for(vault_root, run_id)
+        _write_json(run_dir / "baseline.json", payload)
+        append_event(run_dir, TraceEvent(
+            ts=_timestamp(),
+            kind="snapshot.complete",
+            operation=manifest["operation"],
+            run_id=run_id,
+            label="snapshot completed",
+            data={"root": normalized_root, "file_count": len(entries)},
+        ))
+        return payload

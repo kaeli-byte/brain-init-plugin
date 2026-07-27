@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
 import os
+import re
 import threading
 import unittest
 from unittest.mock import patch
@@ -18,6 +19,7 @@ from brain_runtime.run import (
     plan_run,
     record_event,
     run_dir_for,
+    snapshot_tree,
 )
 from brain_runtime.trace import TraceEvent, append_event, read_events
 from brain_runtime.verify import merge_semantic_report, verify_run
@@ -717,6 +719,115 @@ class ContractRunTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "transcript"):
                 append_event(Path(td), event)
+
+
+class SnapshotTreeTests(unittest.TestCase):
+    def _vault_with_wiki(self, td):
+        vault = Path(td) / "vault"
+        (vault / "wiki" / "claims").mkdir(parents=True)
+        (vault / "wiki" / "sources").mkdir(parents=True)
+        (vault / "wiki" / "claims" / "a.md").write_text("# A\n", encoding="utf-8")
+        (vault / "wiki" / "sources" / "b.md").write_text("# B\n", encoding="utf-8")
+        run_id = create_run(
+            vault,
+            RunSpec("reconcile", "shadow", [], None, BudgetSpec()),
+        )
+        return vault, run_id
+
+    def test_snapshot_writes_sorted_hashes_without_content(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            payload = snapshot_tree(vault, run_id, "wiki")
+            self.assertEqual(payload["root"], "wiki")
+            self.assertEqual(
+                [item["path"] for item in payload["files"]],
+                ["wiki/claims/a.md", "wiki/sources/b.md"],
+            )
+            self.assertTrue(all(
+                re.fullmatch(r"[0-9a-f]{64}", item["sha256"])
+                for item in payload["files"]
+            ))
+            self.assertNotIn("content", json.dumps(payload))
+
+            baseline = json.loads(
+                (
+                    vault / ".brain" / "runs" / run_id / "baseline.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(baseline, payload)
+
+    def test_snapshot_ignores_non_markdown_files(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            (vault / "wiki" / "notes.txt").write_text("skip\n", encoding="utf-8")
+            payload = snapshot_tree(vault, run_id, "wiki")
+            self.assertEqual(
+                [item["path"] for item in payload["files"]],
+                ["wiki/claims/a.md", "wiki/sources/b.md"],
+            )
+
+    def test_snapshot_rejects_absolute_root(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            with self.assertRaisesRegex(ValueError, "vault-relative"):
+                snapshot_tree(vault, run_id, str(vault / "wiki"))
+
+    def test_snapshot_rejects_parent_traversal_root(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            with self.assertRaisesRegex(ValueError, "parent traversal"):
+                snapshot_tree(vault, run_id, "../wiki")
+
+    def test_snapshot_rejects_symlinked_root(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            external = Path(td) / "external-wiki"
+            external.mkdir()
+            (external / "x.md").write_text("# X\n", encoding="utf-8")
+            (vault / "linked-wiki").symlink_to(external, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                snapshot_tree(vault, run_id, "linked-wiki")
+
+    def test_snapshot_rejects_symlinked_descendant(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            external = Path(td) / "external.md"
+            external.write_text("# External\n", encoding="utf-8")
+            (vault / "wiki" / "claims" / "linked.md").symlink_to(external)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                snapshot_tree(vault, run_id, "wiki")
+
+    def test_snapshot_rejects_non_regular_markdown_file(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            os.mkfifo(vault / "wiki" / "claims" / "pipe.md")
+            with self.assertRaisesRegex(ValueError, "non-regular"):
+                snapshot_tree(vault, run_id, "wiki")
+
+    def test_snapshot_rejects_completed_run(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            finish_run(vault, run_id, shadow_verdict=True)
+            with self.assertRaisesRegex(ValueError, "completed"):
+                snapshot_tree(vault, run_id, "wiki")
+
+    def test_second_snapshot_replaces_baseline_atomically(self):
+        with TemporaryDirectory() as td:
+            vault, run_id = self._vault_with_wiki(td)
+            first = snapshot_tree(vault, run_id, "wiki")
+            (vault / "wiki" / "claims" / "c.md").write_text("# C\n", encoding="utf-8")
+            second = snapshot_tree(vault, run_id, "wiki")
+            self.assertNotEqual(first, second)
+            baseline = json.loads(
+                (
+                    vault / ".brain" / "runs" / run_id / "baseline.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(baseline, second)
+            self.assertEqual(
+                [item["path"] for item in baseline["files"]],
+                ["wiki/claims/a.md", "wiki/claims/c.md", "wiki/sources/b.md"],
+            )
 
 
 if __name__ == "__main__":
