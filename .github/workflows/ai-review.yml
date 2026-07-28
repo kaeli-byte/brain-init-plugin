@@ -87,11 +87,11 @@ jobs:
           OCR_LLM_USE_ANTHROPIC: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
         run: |
           if [ -n "$OCR_LLM_URL" ] && [ -n "$OCR_LLM_AUTH_TOKEN" ] && \
-             [ -n "$OCR_LLM_MODEL" ] && [ -n "$OCR_LLM_USE_ANTHROPIC" ]; then
+             [ -n "$OCR_LLM_MODEL" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::AI code review skipped: set OCR_LLM_URL and OCR_LLM_AUTH_TOKEN secrets plus OCR_LLM_MODEL and OCR_LLM_USE_ANTHROPIC variables."
+            echo "::warning::AI code review skipped: set OCR_LLM_URL and OCR_LLM_AUTH_TOKEN secrets plus the OCR_LLM_MODEL variable."
           fi
 
   review:
@@ -168,7 +168,7 @@ jobs:
           llm_url: ${{ secrets.OCR_LLM_URL }}
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
-          llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
+          llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC || 'false' }}
           github_token: ${{ steps.app-token.outputs.token }}
           base_ref: ${{ steps.pr-context.outputs.base_ref }}
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
