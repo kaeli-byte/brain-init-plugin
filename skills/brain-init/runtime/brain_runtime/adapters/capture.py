@@ -286,6 +286,167 @@ def _workflow_checks(vault: Path, run_dir: Path) -> list[CheckResult]:
     ]
 
 
+def _claim_id_from_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    links = wikilinks(value, "claim-")
+    return links[0] if links else None
+
+
+def _staged_reconciliation_checks(
+    vault: Path,
+    run_dir: Path,
+    artifacts: list[ArtifactRef],
+    declared: set[str],
+) -> list[CheckResult] | None:
+    """Staged-capture contract when the run reconciles through a record.
+
+    Triggered by a declared reconciliation artifact or by run metadata that
+    advertises staged reconcile. Returns None for legacy captures so the old
+    claim-count contract applies instead.
+    """
+    records = [artifact for artifact in artifacts if artifact.kind == "reconciliation"]
+    manifest = read_json_nofollow(run_dir / "manifest.json")
+    metadata = manifest.get("metadata") or {}
+    staged = bool(records) or metadata.get("reconcile") == "staged"
+    if not staged:
+        return None
+    checks: list[CheckResult] = []
+    checks.append(check_result(
+        "capture.reconciliation_declared",
+        len(records) == 1,
+        message=f"staged capture must declare exactly one reconciliation record, found {len(records)}",
+    ))
+    if len(records) != 1:
+        return checks
+
+    record_artifact = records[0]
+    record_path = confined_path(vault, record_artifact.path)
+    data: dict[str, Any] = {}
+    if record_path is not None and record_path.is_file():
+        try:
+            data, _ = read_frontmatter(record_path)
+        except (OSError, ValueError, yaml.YAMLError):
+            data = {}
+    record_parse_ok = bool(data)
+    checks.append(check_result(
+        "capture.reconciliation_declared",
+        record_parse_ok,
+        artifact=record_artifact.path,
+        message="declared reconciliation record is missing or unparsable",
+    ))
+    if not record_parse_ok:
+        return checks
+
+    checks.append(check_result(
+        "capture.reconciliation_origin",
+        data.get("origin") == "capture",
+        artifact=record_artifact.path,
+        message="staged capture reconciliation record must have origin: capture",
+    ))
+
+    status = data.get("status")
+    checks.append(check_result(
+        "capture.reconcile_status",
+        status in {"complete", "staged"},
+        artifact=record_artifact.path,
+        message=f"capture finished with reconciliation status: {status}",
+    ))
+    checks.append(check_result(
+        "capture.review_pending",
+        status != "pending_review",
+        artifact=record_artifact.path,
+        message="capture finished with candidates pending human review",
+    ))
+
+    candidates = data.get("candidates")
+    candidates = candidates if isinstance(candidates, list) else []
+    count = len(candidates)
+    checks.append(check_result(
+        "capture.candidate_count_min",
+        count >= 2,
+        artifact=record_artifact.path,
+        message="staged capture requires at least two candidates",
+    ))
+    checks.append(check_result(
+        "capture.candidate_count_max",
+        count <= 6,
+        artifact=record_artifact.path,
+        message="staged capture declares more than six candidates",
+        severity="warning",
+    ))
+
+    record_source_links = wikilinks(data.get("source"), "src-")
+    record_source_id = record_source_links[0] if record_source_links else ""
+    source_artifacts = [artifact for artifact in artifacts if artifact.kind == "source"]
+    source_data: dict[str, Any] = {}
+    if source_artifacts:
+        source_path = confined_path(vault, source_artifacts[0].path)
+        if source_path is not None and source_path.is_file():
+            try:
+                source_data, _ = read_frontmatter(source_path)
+            except (OSError, ValueError, yaml.YAMLError):
+                source_data = {}
+    checks.append(check_result(
+        "capture.reconciliation_source_match",
+        bool(record_source_id)
+        and source_data.get("source_id") == record_source_id,
+        artifact=record_artifact.path,
+        message="reconciliation record source link must match the declared source page",
+    ))
+
+    record_stem = Path(record_artifact.path).stem
+    source_recon_links = wikilinks(source_data.get("reconciliation"), "reconcile-")
+    checks.append(check_result(
+        "capture.reconciliation_link",
+        record_stem in source_recon_links,
+        artifact=source_artifacts[0].path if source_artifacts else record_artifact.path,
+        message="source page reconciliation link must reference the declared record",
+    ))
+
+    applied_results: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("action_state") != "applied":
+            continue
+        result_id = _claim_id_from_value(candidate.get("result_claim"))
+        if result_id is not None:
+            applied_results.add(result_id)
+        result_declared = (
+            result_id is not None
+            and f"wiki/claims/{result_id}.md" in declared
+        )
+        checks.append(check_result(
+            "capture.result_declared",
+            result_declared,
+            artifact=record_artifact.path,
+            message=f"applied result claim wiki/claims/{result_id}.md is not declared",
+        ))
+
+    key_claims = source_data.get("key_claims")
+    key_claim_ids: set[str] = set()
+    if isinstance(key_claims, list):
+        for entry in key_claims:
+            claim_id = _claim_id_from_value(entry) if not isinstance(entry, str) else (
+                entry if entry.startswith("claim-") else _claim_id_from_value(entry)
+            )
+            if claim_id:
+                key_claim_ids.add(claim_id)
+    elif isinstance(key_claims, str):
+        key_claim_ids = set(wikilinks(key_claims, "claim-"))
+    checks.append(check_result(
+        "capture.key_claims_match_results",
+        key_claim_ids == applied_results,
+        artifact=source_artifacts[0].path if source_artifacts else record_artifact.path,
+        message=(
+            f"source key_claims {sorted(key_claim_ids)} must equal the applied "
+            f"result claim set {sorted(applied_results)}"
+        ),
+    ))
+    return checks
+
+
 def capture_checks(
     vault: Path,
     run_dir: Path,
@@ -392,18 +553,24 @@ def capture_checks(
                 message="wiki page must include last_reviewed",
             ))
 
+    staged_checks = _staged_reconciliation_checks(vault_root, run_dir, artifacts, declared)
+    if staged_checks is not None:
+        checks.extend(staged_checks)
+    else:
+        checks.extend([
+            check_result(
+                "capture.claim_count_min",
+                kinds["claim"] >= 2,
+                message="capture must declare at least two claim pages",
+            ),
+            check_result(
+                "capture.claim_count_max",
+                kinds["claim"] <= 6,
+                message="capture declares more than six claims",
+                severity="warning",
+            ),
+        ])
     checks.extend([
-        check_result(
-            "capture.claim_count_min",
-            kinds["claim"] >= 2,
-            message="capture must declare at least two claim pages",
-        ),
-        check_result(
-            "capture.claim_count_max",
-            kinds["claim"] <= 6,
-            message="capture declares more than six claims",
-            severity="warning",
-        ),
         check_result(
             "capture.source_count",
             kinds["source"] == 1,
@@ -411,7 +578,7 @@ def capture_checks(
         ),
         check_result(
             "capture.company_count",
-            kinds["company"] >= 1,
+            staged_checks is not None or kinds["company"] >= 1,
             message="capture must declare at least one company page",
         ),
     ])

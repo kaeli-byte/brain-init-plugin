@@ -483,5 +483,363 @@ class CaptureVerifyTests(unittest.TestCase):
             self.assertRegex(ref.sha256, r"^[0-9a-f]{64}$")
 
 
+STAGED_SOURCE_ID = "src-acme-2026-annual-report"
+STAGED_RECORD_PATH = "wiki/reconciliations/reconcile-src-acme-2026-annual-report.md"
+STAGED_SOURCE_PATH = "wiki/sources/src-acme-2026-annual-report.md"
+STAGED_NEW_CLAIM_PATH = "wiki/claims/claim-acme-revenue-2026.md"
+STAGED_TARGET_CLAIM_PATH = "wiki/claims/claim-acme-operating-margin.md"
+STAGED_NEW_TEXT = "Acme's 2026 revenue reached RMB 12 billion."
+STAGED_CORROBORATING_TEXT = "Acme's 2026 operating margin increased to 14 percent."
+
+
+def _staged_candidate_block(
+    claim_text,
+    *,
+    disposition="new",
+    target_claim="",
+    confidence_effect="unchanged",
+    review_state="not_required",
+    action_state="applied",
+    result_claim='"[[claim-acme-revenue-2026]]"',
+    reviewed_by="",
+    reviewed_at="",
+    review_note="",
+):
+    from brain_runtime.reconcile_contract import candidate_id
+    return (
+        f"  - candidate_id: {candidate_id(STAGED_SOURCE_ID, claim_text)}\n"
+        f'    claim_text: "{claim_text}"\n'
+        "    source_evidence:\n"
+        f'      - source: "[[{STAGED_SOURCE_ID}]]"\n'
+        '        passage: "Exact supporting passage."\n'
+        '        context: "Page 1"\n'
+        '    entities: ["[[company-acme]]"]\n'
+        f"    disposition: {disposition}\n"
+        f"    target_claim: {target_claim}\n"
+        '    reason: "A reason."\n'
+        f"    confidence_effect: {confidence_effect}\n"
+        f"    review_state: {review_state}\n"
+        f"    action_state: {action_state}\n"
+        f"    result_claim: {result_claim}\n"
+        f"    reviewed_by: {reviewed_by}\n"
+        f"    reviewed_at: {reviewed_at}\n"
+        f"    review_note: {review_note}\n"
+    )
+
+
+def _staged_record(*candidates, status="complete", coverage="true", origin="capture"):
+    return (
+        "---\n"
+        "reconciliation_id: reconcile-src-acme-2026-annual-report\n"
+        f'source: "[[{STAGED_SOURCE_ID}]]"\n'
+        f"origin: {origin}\n"
+        f"status: {status}\n"
+        "search_method: qmd\n"
+        f"coverage_complete: {coverage}\n"
+        "created: 2026-07-27\n"
+        "last_reviewed: 2026-07-27\n"
+        "candidates:\n"
+        f"{''.join(candidates)}"
+        "---\n"
+        "# Reconciliation: Acme 2026 Annual Report\n"
+        "\n## Summary\n\nSummary.\n"
+        "\n## Pending Review\n\nNone.\n"
+        "\n## Changelog\n\n- Applied.\n"
+    )
+
+
+def _staged_source_page(key_claims, reconciliation=True):
+    link = f'reconciliation: "[[reconcile-{STAGED_SOURCE_ID}]]"\n' if reconciliation else ""
+    return (
+        "---\n"
+        f"source_id: {STAGED_SOURCE_ID}\n"
+        "raw_path: raw/annual-reports/acme-2026-annual-report.pdf\n"
+        "source_type: annual-report\n"
+        "publisher: Acme Corporation\n"
+        "date_published: 2026-04-01\n"
+        "date_ingested: 2026-07-27\n"
+        "last_reviewed: 2026-07-27\n"
+        "reliability: audited\n"
+        "materiality: high\n"
+        f"key_claims: {key_claims}\n"
+        f"{link}"
+        "entities_covered: [entity-acme]\n"
+        "---\n"
+        "# Acme 2026 Annual Report\n"
+        "## Company\n"
+        "[[company-acme]]\n"
+    )
+
+
+def _staged_company_page():
+    return (
+        "---\n"
+        "company_id: company-acme\n"
+        'legal_name: "Acme Corporation"\n'
+        "last_reviewed: 2026-07-27\n"
+        "---\n"
+        "# Acme Corporation\n"
+        f"[[{STAGED_SOURCE_ID}]]\n"
+    )
+
+
+def _staged_claim_page(claim_id_value, claim_text, *, evidence_source=STAGED_SOURCE_ID):
+    return (
+        "---\n"
+        f"claim_id: {claim_id_value}\n"
+        f'claim_text: "{claim_text}"\n'
+        "confidence: high\n"
+        "status: confirmed\n"
+        "source_evidence:\n"
+        f'  - source: "[[{evidence_source}]]"\n'
+        '    passage: "Supporting passage."\n'
+        '    context: "Page 1"\n'
+        "first_seen: 2026-07-27\n"
+        "last_verified: 2026-07-27\n"
+        "last_reviewed: 2026-07-27\n"
+        "---\n"
+        "# Evidence\n"
+        "## Supporting\n"
+        f"[[{evidence_source}]]\n"
+    )
+
+
+class StagedCaptureTests(unittest.TestCase):
+    """Capture runs that stage candidates into a reconciliation record."""
+
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.vault = Path(self.temporary.name) / "vault"
+        self.vault.mkdir(parents=True)
+        for sub in ("wiki/claims", "wiki/sources", "wiki/reconciliations", "wiki/companies"):
+            (self.vault / sub).mkdir(parents=True)
+        raw_dir = self.vault / "raw/annual-reports"
+        raw_dir.mkdir(parents=True)
+        (raw_dir / "acme-2026-annual-report.pdf").write_bytes(b"fixture-pdf-2026")
+        (self.vault / "wiki/index.md").write_text(
+            "---\nlast_reviewed: 2026-07-27\n---\n# Index\n", encoding="utf-8"
+        )
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def _write(self, relative, content):
+        path = self.vault / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def _standard_vault(self):
+        """Two applied candidates (one new, one corroborating) + consistent source."""
+        self._write(STAGED_RECORD_PATH, _staged_record(
+            _staged_candidate_block(STAGED_NEW_TEXT),
+            _staged_candidate_block(
+                STAGED_CORROBORATING_TEXT,
+                disposition="corroborating",
+                target_claim='"[[claim-acme-operating-margin]]"',
+                result_claim='"[[claim-acme-operating-margin]]"',
+            ),
+        ))
+        self._write(STAGED_SOURCE_PATH, _staged_source_page(
+            "[claim-acme-revenue-2026, claim-acme-operating-margin]",
+        ))
+        self._write(STAGED_NEW_CLAIM_PATH, _staged_claim_page("claim-acme-revenue-2026", STAGED_NEW_TEXT))
+        self._write(STAGED_TARGET_CLAIM_PATH, _staged_claim_page(
+            "claim-acme-operating-margin", STAGED_CORROBORATING_TEXT,
+        ))
+        self._write("wiki/companies/company-acme.md", _staged_company_page())
+
+    def _create_run(self, *, staged=True, legacy=False):
+        if legacy:
+            metadata = {"source_type": "annual-report", "exceeds_one_context": True}
+            return create_run(
+                self.vault,
+                RunSpec(
+                    "capture", "shadow",
+                    ["raw/annual-reports/acme-2025-annual-report.pdf"],
+                    "annual-report-v1", BudgetSpec(), metadata=metadata,
+                ),
+            )
+        metadata = {"reconcile": "staged", "source_type": "annual-report"} if staged else {}
+        return create_run(
+            self.vault,
+            RunSpec(
+                "capture", "shadow",
+                ["raw/annual-reports/acme-2026-annual-report.pdf"],
+                "annual-report-v1" if staged else None,
+                BudgetSpec(), metadata=metadata,
+            ),
+        )
+
+    def _verify(self, *, declared, staged=True, legacy=False):
+        run_id = self._create_run(staged=staged, legacy=legacy)
+        run_dir = run_dir_for(self.vault, run_id)
+        for kind in ("workflow.qmd", "workflow.log"):
+            append_event(run_dir, TraceEvent(
+                ts="2026-07-27T00:00:00Z", kind=kind, operation="capture",
+                run_id=run_id, label=f"{kind} result", data={"passed": True},
+            ))
+        declare_artifacts(self.vault, run_id, declared)
+        return verify_run(self.vault, run_id, capture_checks)
+
+    def _all_declared(self):
+        return [
+            STAGED_RECORD_PATH, STAGED_SOURCE_PATH,
+            STAGED_NEW_CLAIM_PATH, STAGED_TARGET_CLAIM_PATH,
+            "wiki/companies/company-acme.md", "wiki/index.md",
+        ]
+
+    @staticmethod
+    def _checks(report, check_id):
+        return [check for check in report.checks if check.id == check_id]
+
+    def _failed(self, report, check_id):
+        return [check for check in self._checks(report, check_id) if not check.passed]
+
+    def test_staged_capture_with_two_applied_candidates_is_accepted(self):
+        self._standard_vault()
+        report = self._verify(declared=self._all_declared())
+        self.assertTrue(report.accepted, [
+            f"{c.id}: {c.message}" for c in report.checks
+            if not c.passed and c.severity == "critical"
+        ])
+        self.assertFalse(self._failed(report, "capture.candidate_count_min"))
+
+    def test_all_irrelevant_candidates_produce_zero_claims_and_pass(self):
+        self._write(STAGED_RECORD_PATH, _staged_record(
+            _staged_candidate_block(STAGED_NEW_TEXT, disposition="irrelevant",
+                                    action_state="not_applicable",
+                                    confidence_effect="not_applicable", result_claim=""),
+            _staged_candidate_block(STAGED_CORROBORATING_TEXT, disposition="irrelevant",
+                                    action_state="not_applicable",
+                                    confidence_effect="not_applicable", result_claim=""),
+        ))
+        self._write(STAGED_SOURCE_PATH, _staged_source_page("[]"))
+        self._write("wiki/companies/company-acme.md", _staged_company_page())
+        report = self._verify(declared=[STAGED_RECORD_PATH, STAGED_SOURCE_PATH,
+                                        "wiki/companies/company-acme.md", "wiki/index.md"])
+        self.assertFalse(self._failed(report, "capture.claim_count_min"))
+        self.assertTrue(report.accepted, [
+            f"{c.id}: {c.message}" for c in report.checks
+            if not c.passed and c.severity == "critical"
+        ])
+
+    def test_approved_and_rejected_sensitive_candidates_are_accepted(self):
+        self._write(STAGED_RECORD_PATH, _staged_record(
+            _staged_candidate_block(
+                STAGED_NEW_TEXT,
+                disposition="updating",
+                target_claim='"[[claim-acme-operating-margin]]"',
+                review_state="approved", action_state="applied",
+                result_claim='"[[claim-acme-revenue-2026]]"',
+                reviewed_by="human", reviewed_at="2026-07-27", review_note='"ok"',
+            ),
+            _staged_candidate_block(
+                STAGED_CORROBORATING_TEXT,
+                disposition="superseding",
+                target_claim='"[[claim-acme-operating-margin]]"',
+                review_state="rejected", action_state="rejected", result_claim="",
+                reviewed_by="human", reviewed_at="2026-07-27", review_note='"not better"',
+            ),
+        ))
+        self._write(STAGED_SOURCE_PATH, _staged_source_page("[claim-acme-revenue-2026]"))
+        self._write(STAGED_NEW_CLAIM_PATH, _staged_claim_page("claim-acme-revenue-2026", STAGED_NEW_TEXT))
+        self._write(STAGED_TARGET_CLAIM_PATH, _staged_claim_page(
+            "claim-acme-operating-margin", STAGED_CORROBORATING_TEXT,
+        ))
+        self._write("wiki/companies/company-acme.md", _staged_company_page())
+        report = self._verify(declared=self._all_declared())
+        self.assertFalse(self._failed(report, "capture.review_pending"))
+
+    def test_pending_review_is_critical_shadow_finding_but_preserves_artifacts(self):
+        self._write(STAGED_RECORD_PATH, _staged_record(
+            _staged_candidate_block(STAGED_NEW_TEXT),
+            _staged_candidate_block(
+                STAGED_CORROBORATING_TEXT,
+                disposition="updating",
+                target_claim='"[[claim-acme-operating-margin]]"',
+                review_state="pending", action_state="pending", result_claim="",
+            ),
+            status="pending_review",
+        ))
+        self._write(STAGED_SOURCE_PATH, _staged_source_page("[claim-acme-revenue-2026]"))
+        self._write(STAGED_NEW_CLAIM_PATH, _staged_claim_page("claim-acme-revenue-2026", STAGED_NEW_TEXT))
+        self._write(STAGED_TARGET_CLAIM_PATH, _staged_claim_page(
+            "claim-acme-operating-margin", STAGED_CORROBORATING_TEXT,
+        ))
+        self._write("wiki/companies/company-acme.md", _staged_company_page())
+        report = self._verify(declared=self._all_declared())
+        self.assertFalse(report.accepted)
+        failed = self._failed(report, "capture.review_pending")
+        self.assertTrue(failed)
+        self.assertEqual(failed[0].severity, "critical")
+        # artifacts preserved: artifact checks still pass
+        self.assertFalse(self._failed(report, "artifact.exists"))
+
+    def test_incomplete_coverage_is_critical_shadow_finding(self):
+        self._write(STAGED_RECORD_PATH, _staged_record(
+            _staged_candidate_block(STAGED_NEW_TEXT),
+            _staged_candidate_block(STAGED_CORROBORATING_TEXT, disposition="irrelevant",
+                                    action_state="not_applicable",
+                                    confidence_effect="not_applicable", result_claim=""),
+            status="incomplete", coverage="false",
+        ))
+        self._write(STAGED_SOURCE_PATH, _staged_source_page("[claim-acme-revenue-2026]"))
+        self._write(STAGED_NEW_CLAIM_PATH, _staged_claim_page("claim-acme-revenue-2026", STAGED_NEW_TEXT))
+        report = self._verify(declared=[STAGED_RECORD_PATH, STAGED_SOURCE_PATH,
+                                        STAGED_NEW_CLAIM_PATH, "wiki/index.md"])
+        self.assertFalse(report.accepted)
+        self.assertTrue(self._failed(report, "capture.reconcile_status"))
+
+    def test_source_key_claims_must_equal_applied_result_set(self):
+        self._standard_vault()
+        # source lists a claim that no applied candidate produced
+        self._write(STAGED_SOURCE_PATH, _staged_source_page(
+            "[claim-acme-revenue-2026, claim-acme-operating-margin, claim-unrelated]",
+        ))
+        report = self._verify(declared=self._all_declared())
+        self.assertFalse(report.accepted)
+        self.assertTrue(self._failed(report, "capture.key_claims_match_results"))
+
+    def test_source_reconciliation_link_must_match_declared_record(self):
+        self._standard_vault()
+        self._write(STAGED_SOURCE_PATH, _staged_source_page(
+            "[claim-acme-revenue-2026, claim-acme-operating-margin]",
+            reconciliation=False,
+        ))
+        report = self._verify(declared=self._all_declared())
+        self.assertFalse(report.accepted)
+        self.assertTrue(self._failed(report, "capture.reconciliation_link"))
+
+    def test_record_not_declared_is_critical(self):
+        self._standard_vault()
+        report = self._verify(declared=[STAGED_SOURCE_PATH, STAGED_NEW_CLAIM_PATH,
+                                        STAGED_TARGET_CLAIM_PATH, "wiki/index.md"])
+        self.assertFalse(report.accepted)
+        self.assertTrue(self._failed(report, "capture.reconciliation_declared"))
+
+    def test_applied_result_claim_not_declared_is_critical(self):
+        self._standard_vault()
+        report = self._verify(declared=[STAGED_RECORD_PATH, STAGED_SOURCE_PATH,
+                                        STAGED_TARGET_CLAIM_PATH, "wiki/index.md"])
+        self.assertFalse(report.accepted)
+        self.assertTrue(self._failed(report, "capture.result_declared"))
+
+    def test_legacy_capture_without_reconciliation_stays_accepted(self):
+        # Old-style capture: claims declared directly, no reconciliation record,
+        # metadata does not advertise staged reconcile.
+        vault_paths = build_capture_vault(self.vault)
+        second = self.vault / vault_paths[0]
+        duplicate = second.with_name("claim-acme-revenue-second.md")
+        duplicate.write_text(second.read_text().replace(
+            "claim-acme-revenue-12345678", "claim-acme-revenue-87654321",
+        ))
+        vault_paths.insert(1, duplicate.relative_to(self.vault).as_posix())
+        report = self._verify(declared=vault_paths, staged=False, legacy=True)
+        self.assertTrue(report.accepted, [
+            f"{c.id}: {c.message}" for c in report.checks
+            if not c.passed and c.severity == "critical"
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()
