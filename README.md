@@ -241,7 +241,17 @@ To enable it, set in **Settings → Secrets and variables → Actions**:
 | Variable | `OCR_LLM_MODEL` | Model name |
 | Variable | `OCR_LLM_USE_ANTHROPIC` | `true` for Anthropic, `false` for OpenAI-compatible |
 
-Without these, the workflow logs a warning and skips cleanly.
+Review comments are posted under a GitHub App identity (not `github-actions[bot]`).
+The App needs **Pull requests: read & write** and **Contents: read** on this repo,
+plus these secrets:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `MY_GITHUB_APP_ID` | GitHub App ID |
+| Secret | `MY_GITHUB_APP_PRIVATE_KEY` | App private key (PEM) |
+| Secret | `GITHUB_APP_INSTALLATION_ID` | Installation ID for this repo |
+
+Without the LLM configuration, the workflow logs a warning and skips cleanly.
 
 ## Examples
 
