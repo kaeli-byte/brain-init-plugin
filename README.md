@@ -224,6 +224,24 @@ Use `--no-supporting-skills` to skip data-source skills (second-brain is always 
 If you have a legacy `~/deep-tech-wiki` clone, it still works as a fallback template source.
 The plugin takes priority when both are available. Use `--template-path` for explicit control.
 
+## Automated PR Review
+
+Pull requests are reviewed automatically by [OpenCodeReview](https://open-codereview.ai/docs/cicd)
+(`.github/workflows/ai-review.yml`). The review is advisory: it posts one sticky
+summary comment plus inline findings, and never blocks merging. It runs on
+opened/updated non-draft PRs, or when a maintainer comments `/review`.
+
+To enable it, set in **Settings → Secrets and variables → Actions**:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `OCR_LLM_URL` | LLM API endpoint |
+| Secret | `OCR_LLM_AUTH_TOKEN` | LLM auth token |
+| Variable | `OCR_LLM_MODEL` | Model name |
+| Variable | `OCR_LLM_USE_ANTHROPIC` | `true` for Anthropic, `false` for OpenAI-compatible |
+
+Without these, the workflow logs a warning and skips cleanly.
+
 ## Examples
 
 ```bash
