@@ -34,6 +34,7 @@
     "entities_covered": "multitext",
 
     "reconciliation_id": "text",
+    "source": "text",
     "origin": "text",
     "search_method": "text",
     "coverage_complete": "checkbox",

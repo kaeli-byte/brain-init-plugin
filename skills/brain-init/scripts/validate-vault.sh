@@ -44,15 +44,15 @@ warn() { echo "  [WARN] $1"; WARN=$((WARN + 1)); }
 echo "── Directory Structure ──"
 
 WIKI_DIRS=$(find "$VAULT_PATH/wiki" -type d 2>/dev/null | wc -l | tr -d ' ')
-if [ "$WIKI_DIRS" -ge 17 ]; then
-  pass "16+ wiki directories (found $WIKI_DIRS)"
+if [ "$WIKI_DIRS" -ge 18 ]; then
+  pass "17+ wiki directories (found $WIKI_DIRS)"
 else
-  fail "16+ wiki directories (found $WIKI_DIRS)"
+  fail "17+ wiki directories (found $WIKI_DIRS)"
 fi
 
 for dir in analyses claims companies concepts industries investigations \
            markets patent-families people processes products queries \
-           regulations sources standards syntheses technologies; do
+           reconciliations regulations sources standards syntheses technologies; do
   if [ -d "$VAULT_PATH/wiki/$dir" ]; then
     pass "  wiki/$dir/"
   else
@@ -245,6 +245,66 @@ if content.startswith('---'):
   fi
 done
 echo "    $SKILL_OK passed, $SKILL_FAIL failed"
+
+# ═══════════════════════════════════════════════════════════════
+# 6b. Reconciliation Contract
+# ═══════════════════════════════════════════════════════════════
+echo ""
+echo "── Reconciliation Contract ──"
+
+[ -d "$VAULT_PATH/wiki/reconciliations" ] && \
+  pass "wiki/reconciliations/" || fail "wiki/reconciliations/ — MISSING"
+
+RECON_SCHEMA="$VAULT_PATH/templates/schemas/reconciliation.yaml"
+if [ -f "$RECON_SCHEMA" ]; then
+  if python3 -c "import yaml; yaml.safe_load(open('$RECON_SCHEMA'))" 2>/dev/null; then
+    pass "reconciliation.yaml: parseable"
+  else
+    fail "reconciliation.yaml: INVALID YAML"
+  fi
+else
+  fail "reconciliation.yaml — MISSING"
+fi
+
+# Reconciliation schema fields must be represented in types.json
+if [ -f "$TYPES_JSON" ] && [ -f "$RECON_SCHEMA" ]; then
+  RECON_FIELDS=$(grep -oE '^[a-z][a-z_0-9]*:' "$RECON_SCHEMA" | tr -d ':' | sort -u)
+  MISSING_RECON_FIELDS=""
+  for field in $RECON_FIELDS; do
+    if ! python3 -c "
+import json, sys
+types = json.load(open('$TYPES_JSON')).get('types', {})
+sys.exit(0 if '$field' in types else 1)
+" 2>/dev/null; then
+      MISSING_RECON_FIELDS="$MISSING_RECON_FIELDS $field"
+    fi
+  done
+  if [ -z "$MISSING_RECON_FIELDS" ]; then
+    pass "reconciliation schema fields represented in types.json"
+  else
+    fail "reconciliation schema fields missing from types.json:$MISSING_RECON_FIELDS"
+  fi
+fi
+
+RECON_SKILL="$SKILL_BASE/second-brain-reconcile"
+[ -f "$RECON_SKILL/SKILL.md" ] && \
+  pass "second-brain-reconcile skill present" || fail "second-brain-reconcile skill — MISSING"
+for ref in automatic-handoff.md reconciliation-record.md; do
+  if [ -f "$RECON_SKILL/references/$ref" ]; then
+    pass "  references/$ref"
+  else
+    fail "  references/$ref — MISSING"
+  fi
+done
+
+# Runtime snapshot command availability (runtime absence stays warning-only)
+if [ -f "$VAULT_PATH/.brain/runtime/brain_runtime/cli.py" ]; then
+  if PYTHONPATH="$VAULT_PATH/.brain/runtime" python3 -m brain_runtime.cli snapshot --help >/dev/null 2>&1; then
+    pass "runtime snapshot command available"
+  else
+    fail "runtime snapshot command unavailable"
+  fi
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # 7. Brain Runtime
