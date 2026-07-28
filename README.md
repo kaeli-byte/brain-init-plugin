@@ -229,7 +229,8 @@ The plugin takes priority when both are available. Use `--template-path` for exp
 Pull requests are reviewed automatically by [OpenCodeReview](https://open-codereview.ai/docs/cicd)
 (`.github/workflows/ai-review.yml`). The review is advisory: it posts one sticky
 summary comment plus inline findings, and never blocks merging. It runs on
-opened/updated non-draft PRs, or when a maintainer comments `/review`.
+opened/updated non-draft PRs, or when a maintainer comments `/review` (or
+`/open-code-review`).
 
 To enable it, set in **Settings → Secrets and variables → Actions**:
 

@@ -44,8 +44,10 @@ concurrency:
             || github.event.comment.author_association == 'COLLABORATOR'
           )
           && (
-            startsWith(github.event.comment.body, '/review')
-            || startsWith(github.event.comment.body, '/open-code-review')
+            github.event.comment.body == '/review'
+            || startsWith(github.event.comment.body, '/review ')
+            || github.event.comment.body == '/open-code-review'
+            || startsWith(github.event.comment.body, '/open-code-review ')
           )
         )
       )
@@ -63,9 +65,10 @@ on:
   issue_comment:
     types: [created]
 
+# Workflow-level permissions are read-only; only the review job elevates to
+# pull-requests: write so preflight runs with minimal privileges.
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   # Skip quietly when the LLM secrets/vars are not configured. Job output is
@@ -95,6 +98,9 @@ jobs:
     needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
     # Advisory-only review. Never gate on findings; the composite action only
     # posts comments and cannot request changes.
     if: |
@@ -114,8 +120,10 @@ jobs:
             || github.event.comment.author_association == 'COLLABORATOR'
           )
           && (
-            startsWith(github.event.comment.body, '/review')
-            || startsWith(github.event.comment.body, '/open-code-review')
+            github.event.comment.body == '/review'
+            || startsWith(github.event.comment.body, '/review ')
+            || github.event.comment.body == '/open-code-review'
+            || startsWith(github.event.comment.body, '/open-code-review ')
           )
         )
       )
@@ -136,11 +144,14 @@ jobs:
             core.setOutput('base_ref', pullRequest.base.ref);
             core.setOutput('head_sha', pullRequest.head.sha);
 
-      # Pinned to the commit that added bounded inline-comment batching
-      # (alibaba/open-code-review#507). Bump deliberately after reviewing
-      # upstream changes.
+      # Pinned to the full commit SHA that added bounded inline-comment
+      # batching (alibaba/open-code-review#507); the npm package is pinned to
+      # the vetted version as well. Bump both deliberately after reviewing
+      # upstream changes. continue-on-error keeps a broken OCR run from
+      # failing the workflow — the review is advisory.
       - name: Run OpenCodeReview
-        uses: alibaba/open-code-review@2e9938780b94
+        continue-on-error: true
+        uses: alibaba/open-code-review@2e9938780b941e46b76ab3340e718e280b10c66f
         with:
           llm_url: ${{ secrets.OCR_LLM_URL }}
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
@@ -148,6 +159,7 @@ jobs:
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
           base_ref: ${{ steps.pr-context.outputs.base_ref }}
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
+          ocr_version: '1.8.0'
           # Advisory posture: one sticky summary comment, updated in place on
           # each run; inline findings are incremental and never deleted.
           sticky_summary: 'true'
