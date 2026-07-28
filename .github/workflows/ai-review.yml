@@ -128,6 +128,18 @@ jobs:
         )
       )
     steps:
+      # Comments posted as the GitHub App bot (not github-actions[bot]), per
+      # the OpenCodeReview examples: GITHUB_TOKEN suppresses events from its
+      # own comments, but an App token does not — the job-level Bot guard in
+      # `if` is what prevents self-triggering loops, so keep it intact.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.MY_GITHUB_APP_ID }}
+          private-key: ${{ secrets.MY_GITHUB_APP_PRIVATE_KEY }}
+          installation-id: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+
       - name: Get PR context
         id: pr-context
         if: github.event_name == 'issue_comment'
@@ -157,6 +169,7 @@ jobs:
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           llm_model: ${{ vars.OCR_LLM_MODEL }}
           llm_use_anthropic: ${{ vars.OCR_LLM_USE_ANTHROPIC }}
+          github_token: ${{ steps.app-token.outputs.token }}
           base_ref: ${{ steps.pr-context.outputs.base_ref }}
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
           ocr_version: '1.8.0'
