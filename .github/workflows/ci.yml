@@ -508,10 +508,16 @@ jobs:
           [ -f "$VAULT/wiki/user-page.md" ] || { echo "FAIL: wiki content was not preserved"; exit 1; }
           [ -f "$VAULT/raw/user-source.txt" ] || { echo "FAIL: raw content was not preserved"; exit 1; }
 
-          # Legacy vault has no reconcile-aware contract; upgrade must add it
-          [ ! -d "$VAULT/wiki/reconciliations" ] && : || { echo "FAIL: test setup unexpectedly has reconciliations dir"; exit 1; }
-          [ ! -e "$VAULT/templates/schemas/reconciliation.yaml" ] || { echo "FAIL: test setup unexpectedly has reconciliation schema"; exit 1; }
-          [ ! -e "$VAULT/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ] || { echo "FAIL: test setup unexpectedly has reconcile reference"; exit 1; }
+          # Legacy vault has no reconcile-aware contract; upgrade must add it.
+          # Reconcile is now part of the standard scaffold — strip it to
+          # simulate a vault created before the reconcile feature shipped.
+          rm -rf \
+            "$VAULT/wiki/reconciliations" \
+            "$VAULT/templates/schemas/reconciliation.yaml" \
+            "$VAULT/.claude/skills/second-brain-reconcile"
+          [ ! -d "$VAULT/wiki/reconciliations" ] && : || { echo "FAIL: failed to strip wiki/reconciliations"; exit 1; }
+          [ ! -e "$VAULT/templates/schemas/reconciliation.yaml" ] || { echo "FAIL: failed to strip reconciliation schema"; exit 1; }
+          [ ! -e "$VAULT/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ] || { echo "FAIL: failed to strip reconcile reference"; exit 1; }
           SENTINEL_BEFORE="$(shasum -a 256 "$VAULT/wiki/user-page.md" | cut -d' ' -f1)"
           bash skills/brain-init/scripts/brain-init.sh --upgrade-harness "$VAULT"
           [ -d "$VAULT/wiki/reconciliations" ] || { echo "FAIL: upgrade did not add wiki/reconciliations"; exit 1; }
