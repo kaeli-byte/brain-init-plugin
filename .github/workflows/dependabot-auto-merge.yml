@@ -12,11 +12,16 @@ jobs:
     steps:
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@7a4b92f93a68 # v2
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve PR
+      # Approve only semver patch/minor updates; major bumps stay unapproved
+      # and un-merged so a human reviews them.
+      - name: Approve PR (patch & minor only)
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

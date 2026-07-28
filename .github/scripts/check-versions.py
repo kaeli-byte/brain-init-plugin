@@ -101,7 +101,9 @@ def main() -> int:
         base = os.environ.get("GITHUB_BASE_REF", "origin/master")
         target = f"origin/{base}"
         try:
-            run(["git", "fetch", "origin", base, "--depth=1"])
+            # Needs more than depth=1 so the PR's merge-base with the base
+            # branch is present (fork PRs especially).
+            run(["git", "fetch", "origin", base, "--depth=50"])
         except subprocess.CalledProcessError:
             pass
     else:
