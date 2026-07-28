@@ -239,6 +239,12 @@ jobs:
           grep -q '^/.brain/runs/' "$TMP/test-full/.gitignore" || { echo "FAIL: runtime runs are not gitignored"; exit 1; }
           PYTHONPATH="$TMP/test-full/.brain/runtime" python3 -c 'import brain_runtime; print(brain_runtime.__version__)'
 
+          echo "=== Reconcile-aware vault contract ==="
+          [ -d "$TMP/test-full/wiki/reconciliations" ] || { echo "FAIL: wiki/reconciliations missing"; exit 1; }
+          [ -f "$TMP/test-full/templates/schemas/reconciliation.yaml" ] || { echo "FAIL: reconciliation schema missing"; exit 1; }
+          [ -f "$TMP/test-full/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ] || { echo "FAIL: reconcile reference missing"; exit 1; }
+          grep -q '^## Reconciliations (0)' "$TMP/test-full/wiki/index.md" || { echo "FAIL: index Reconciliations section missing"; exit 1; }
+
           echo "=== Validate the scaffold ==="
           set +e
           VALIDATE_OUTPUT="$(
@@ -502,6 +508,23 @@ jobs:
           [ -f "$VAULT/wiki/user-page.md" ] || { echo "FAIL: wiki content was not preserved"; exit 1; }
           [ -f "$VAULT/raw/user-source.txt" ] || { echo "FAIL: raw content was not preserved"; exit 1; }
 
+          # Legacy vault has no reconcile-aware contract; upgrade must add it.
+          # Reconcile is now part of the standard scaffold — strip it to
+          # simulate a vault created before the reconcile feature shipped.
+          rm -rf \
+            "$VAULT/wiki/reconciliations" \
+            "$VAULT/templates/schemas/reconciliation.yaml" \
+            "$VAULT/.claude/skills/second-brain-reconcile"
+          [ ! -d "$VAULT/wiki/reconciliations" ] && : || { echo "FAIL: failed to strip wiki/reconciliations"; exit 1; }
+          [ ! -e "$VAULT/templates/schemas/reconciliation.yaml" ] || { echo "FAIL: failed to strip reconciliation schema"; exit 1; }
+          [ ! -e "$VAULT/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ] || { echo "FAIL: failed to strip reconcile reference"; exit 1; }
+          SENTINEL_BEFORE="$(shasum -a 256 "$VAULT/wiki/user-page.md" | cut -d' ' -f1)"
+          bash skills/brain-init/scripts/brain-init.sh --upgrade-harness "$VAULT"
+          [ -d "$VAULT/wiki/reconciliations" ] || { echo "FAIL: upgrade did not add wiki/reconciliations"; exit 1; }
+          [ -f "$VAULT/templates/schemas/reconciliation.yaml" ] || { echo "FAIL: upgrade did not add reconciliation schema"; exit 1; }
+          [ -f "$VAULT/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ] || { echo "FAIL: upgrade did not install reconcile references"; exit 1; }
+          [ "$(shasum -a 256 "$VAULT/wiki/user-page.md" | cut -d' ' -f1)" = "$SENTINEL_BEFORE" ] || { echo "FAIL: sentinel wiki page changed"; exit 1; }
+
           mkdir -p "$VAULT/.brain/runs/preserve-me"
           printf '%s\n' keep > "$VAULT/.brain/runs/preserve-me/marker.txt"
           printf '%s\n' labels > "$VAULT/.brain/evals/human-labels.jsonl"
@@ -512,6 +535,7 @@ jobs:
 
           [ -f "$VAULT/.brain/runs/preserve-me/marker.txt" ] || { echo "FAIL: upgrade deleted run history"; exit 1; }
           [ -f "$VAULT/.brain/evals/human-labels.jsonl" ] || { echo "FAIL: upgrade deleted eval labels"; exit 1; }
+          [ "$(shasum -a 256 "$VAULT/.brain/runs/preserve-me/marker.txt" | cut -d' ' -f1)" = "f660a7996deacfbc7560e4240054a8ad82eb02fe25a95064257e07084bcacb85" ] || { echo "FAIL: run history bytes changed"; exit 1; }
           [ ! -e "$VAULT/.brain/runtime/brain_runtime/stale-runtime.txt" ] || { echo "FAIL: repeat upgrade did not replace stale runtime"; exit 1; }
           [ "$(grep -cFx '/.brain/runs/' "$VAULT/.gitignore")" -eq 1 ] || { echo "FAIL: gitignore migration is not idempotent"; exit 1; }
           [ "$(grep -cFx '.brain/runs/' "$VAULT/.claudeignore")" -eq 1 ] || { echo "FAIL: claudeignore migration is not idempotent"; exit 1; }

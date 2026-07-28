@@ -4,6 +4,7 @@ from typing import Callable
 
 from ..contracts import ArtifactRef, CheckResult
 from .capture import capture_checks
+from .reconcile import reconcile_checks
 
 
 VerificationAdapter = Callable[
@@ -13,6 +14,7 @@ VerificationAdapter = Callable[
 
 _VERIFICATION_ADAPTERS: dict[str, VerificationAdapter] = {
     "capture": capture_checks,
+    "reconcile": reconcile_checks,
 }
 
 

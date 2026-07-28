@@ -1,6 +1,6 @@
 ---
 name: brain-init
-version: 1.2.0
+version: 1.3.0
 description: >
   Initialize a new Industrial Intelligence Brain vault. Creates the full harness —
   directory tree, 18 page-type schemas, Obsidian vault config, ECC hooks, agent
@@ -163,5 +163,6 @@ $PLUGIN_ROOT/
 
 ## Changelog
 
+- v1.3.0 (2026-07-28): Reconcile loop-graph runtime. Capture stages 2–6 material candidates into a canonical reconciliation record and hands them to reconcile; reconcile classifies six dispositions, applies safe ones automatically, and gates sensitive ones behind inline human review. Fresh and upgraded vaults install the reconcile-aware contract (wiki/reconciliations/, reconciliation schema, reconcile references). Runtime snapshot + reconcile verification adapters; runtime stays shadow-only.
 - v1.2.0 (2026-07-26): Added the shadow-only capture loop-graph runtime, runtime ownership and installer safeguards, and expanded 11-section vault validation.
 - v1.0.0 (2026-07-23): Initial release as self-contained Claude Code plugin. Plugin-aware path resolution with legacy fallback. All scaffolding assets bundled. Obsidian plugins declared but not bundled.

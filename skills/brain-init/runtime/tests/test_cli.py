@@ -376,6 +376,26 @@ class CliTests(unittest.TestCase):
             },
         )
 
+    def test_snapshot_writes_baseline(self):
+        run_id = self._start()
+        result = self._run(
+            "snapshot",
+            "--vault",
+            self.vault,
+            "--run-id",
+            run_id,
+            "--root",
+            "wiki",
+        )
+        self.assertEqual(result.returncode, 0)
+        baseline = self.vault / ".brain" / "runs" / run_id / "baseline.json"
+        self.assertTrue(baseline.is_file())
+        payload = json.loads(baseline.read_text(encoding="utf-8"))
+        self.assertEqual(payload["root"], "wiki")
+        self.assertTrue(
+            all(item["path"].startswith("wiki/") for item in payload["files"])
+        )
+
     def test_adapter_boundary_resolves_capture_and_rejects_unknown_operation(self):
         from brain_runtime import adapters
         from brain_runtime.adapters.capture import capture_checks

@@ -247,7 +247,7 @@ replace_runtime_code() (
 )
 
 # ── Defaults ──────────────────────────────────────────────────
-BRAIN_INIT_VERSION="1.2.0"
+BRAIN_INIT_VERSION="1.3.0"
 DOMAIN="${BRAIN_DOMAIN:-industrial-intelligence}"
 DOMAIN_CUSTOM=""
 VAULT_PATH=""
@@ -460,9 +460,9 @@ if [ "$UPGRADE_HARNESS" = true ]; then
             if [ -f "$skill_dir/SKILL.md" ]; then
                 # Clean up old nested structure
                 rm -rf "$VAULT_PATH/.claude/skills/second-brain/$skill_name" 2>/dev/null
-                # Deploy to flat path
+                # Deploy to flat path (full directory contents, including references/)
                 mkdir -p "$VAULT_PATH/.claude/skills/$skill_full_name"
-                cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/$skill_full_name/"
+                cp -R "$skill_dir"/. "$VAULT_PATH/.claude/skills/$skill_full_name/"
                 SKILL_UPDATED=$((SKILL_UPDATED + 1))
             fi
         done
@@ -487,6 +487,9 @@ if [ "$UPGRADE_HARNESS" = true ]; then
         }
         echo "  capture reference assets: updated"; UPGRADED=$((UPGRADED + 1))
     fi
+
+    # Add the reconcile-aware wiki contract (preserve all existing wiki content)
+    mkdir -p "$VAULT_PATH/wiki/reconciliations"
 
     # Update schemas (add new, overwrite existing)
     if [ -d "$SCHEMAS_SRC" ]; then
@@ -717,10 +720,10 @@ fi
 echo ""
 echo "[Phase 1] Scaffolding directory tree..."
 
-# Wiki subdirectories (16 + _indexes)
+# Wiki subdirectories (17 + _indexes)
 for dir in analyses applications claims companies concepts industries \
            investigations markets patent-families people processes products \
-           queries regulations sources standards syntheses technologies _indexes; do
+           queries reconciliations regulations sources standards syntheses technologies _indexes; do
   mkdir -p "$VAULT_PATH/wiki/$dir"
 done
 
@@ -832,6 +835,7 @@ tags: [index]
 |----------|-------|
 | sources | 0 |
 | claims | 0 |
+| reconciliations | 0 |
 | companies | 0 |
 | technologies | 0 |
 | patent-families | 0 |
@@ -849,6 +853,10 @@ tags: [index]
 | standards | 0 |
 | investigations | 0 |
 | **Total** | **0** |
+
+## Sources (0)
+
+## Reconciliations (0)
 
 _Ingest your first source with \`/second-brain-capture\` to begin compounding._
 INDEXMD
@@ -953,7 +961,7 @@ if [ -d "$SECOND_BRAIN_SRC" ]; then
     skill_full_name="second-brain-$skill_name"
     if [ -f "$skill_dir/SKILL.md" ]; then
       mkdir -p "$VAULT_PATH/.claude/skills/$skill_full_name"
-      cp "$skill_dir/SKILL.md" "$VAULT_PATH/.claude/skills/$skill_full_name/"
+      cp -R "$skill_dir"/. "$VAULT_PATH/.claude/skills/$skill_full_name/"
       SKILL_INSTALLED=$((SKILL_INSTALLED + 1))
     fi
   done
@@ -1468,8 +1476,20 @@ check() {
 }
 
 # Directory structure
-check "16+ wiki directories present" \
-  '[ $(find "$VAULT_PATH/wiki" -type d | wc -l) -ge 17 ]'
+check "17+ wiki directories present" \
+  '[ $(find "$VAULT_PATH/wiki" -type d | wc -l) -ge 18 ]'
+
+check "wiki/reconciliations present" \
+  '[ -d "$VAULT_PATH/wiki/reconciliations" ]'
+
+check "reconciliation schema installed" \
+  '[ -f "$VAULT_PATH/templates/schemas/reconciliation.yaml" ]'
+
+check "reconcile references installed" \
+  '[ -f "$VAULT_PATH/.claude/skills/second-brain-reconcile/references/automatic-handoff.md" ]'
+
+check "index Reconciliations stub present" \
+  'grep -q "^## Reconciliations (0)" "$VAULT_PATH/wiki/index.md"'
 
 # Schema count and validity
 check "Schemas installed (>0)" \

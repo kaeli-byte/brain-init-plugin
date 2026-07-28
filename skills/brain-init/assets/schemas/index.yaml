@@ -15,6 +15,9 @@
 # ## Sources ({{count}})
 # {{list with one-line summary and date}}
 #
+# ## Reconciliations ({{count}})
+# {{list of reconciliation records with status}}
+#
 # ## Claims ({{count}})
 # {{list by confidence level}}
 #

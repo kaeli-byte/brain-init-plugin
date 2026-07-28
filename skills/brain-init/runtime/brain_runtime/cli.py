@@ -14,6 +14,7 @@ from .run import (
     load_manifest,
     plan_run,
     record_event,
+    snapshot_tree,
 )
 from .verify import merge_semantic_report, verify_run
 
@@ -88,6 +89,11 @@ def _parser() -> argparse.ArgumentParser:
     finish = commands.add_parser("finish")
     _vault_argument(finish)
     finish.add_argument("--run-id", required=True)
+
+    snapshot = commands.add_parser("snapshot")
+    _vault_argument(snapshot)
+    snapshot.add_argument("--run-id", required=True)
+    snapshot.add_argument("--root", required=True)
     return parser
 
 
@@ -171,6 +177,10 @@ def _finish(args: argparse.Namespace) -> None:
     finish_run(args.vault, args.run_id)
 
 
+def _snapshot(args: argparse.Namespace) -> None:
+    snapshot_tree(args.vault, args.run_id, args.root)
+
+
 _COMMANDS = {
     "start": _start,
     "plan": _plan,
@@ -179,6 +189,7 @@ _COMMANDS = {
     "verify": _verify,
     "semantic": _semantic,
     "finish": _finish,
+    "snapshot": _snapshot,
 }
 
 

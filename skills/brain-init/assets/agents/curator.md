@@ -63,6 +63,28 @@ When a candidate claims something about an entity that already has wiki pages:
 7. Append to `wiki/log.md`
 8. Run `qmd update && qmd embed`
 
+## Reconciliation Boundaries (canonical record workflow)
+
+When processing a staged reconciliation record
+(`wiki/reconciliations/reconcile-<source-id>.md`):
+
+- **Safe dispositions** — `new`, `corroborating`, `irrelevant` — are applied
+  automatically.
+- **Review-required dispositions** — `updating`, `contradicting`, `superseding` — must
+  never mutate a target before the recorded inline human approval
+  (`review_state: approved`). No approval, no mutation.
+- **No repeated action during resume.** Skip every candidate whose `action_state` is
+  already terminal (`applied`, `not_applicable`, `rejected`); an applied action is
+  never applied twice.
+- **No claim deletion.** Reconcile never deletes a canonical claim. History is
+  preserved with `valid_from`, `valid_to`, `status: superseded`, `superseded_by`, and
+  reciprocal links.
+- **Comparator coverage requirement.** No candidate may be recorded as `new` unless the
+  record's `coverage_complete` is `true`. If coverage cannot be completed safely, the
+  record stays `incomplete` and nothing speculative is applied.
+- **Exact output.** Report applied / pending / rejected candidate counts and the
+  reconciliation record path when finished.
+
 ## Stopping Conditions
 
 - All candidates classified and merged
