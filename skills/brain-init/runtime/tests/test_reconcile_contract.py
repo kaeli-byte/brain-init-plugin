@@ -73,5 +73,34 @@ class ReconcileContractTests(unittest.TestCase):
         self.assertIn("valid_to", types)
 
 
+class ReconcileSkillContractTests(unittest.TestCase):
+    """Static contract for the reconcile skill's runtime integration."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.skill_text = (
+            BRAIN_INIT_ROOT / "bundles/second-brain/reconcile/SKILL.md"
+        ).read_text(encoding="utf-8")
+
+    def test_skill_contains_runtime_and_staging_contract(self):
+        required_phrases = [
+            "BRAIN_RUNTIME_MODE=off",
+            "--operation reconcile",
+            "brain_runtime.cli snapshot",
+            "reconcile.search",
+            "reconcile.classified",
+            "review.decision",
+            "coverage_complete",
+            "pending_review",
+            "legacy",
+        ]
+        for phrase in required_phrases:
+            self.assertIn(phrase, self.skill_text)
+
+    def test_skill_forbids_non_shadow_modes_and_parallel_curators(self):
+        for forbidden in ("--mode active", "--mode enforce", "parallel curator"):
+            self.assertNotIn(forbidden, self.skill_text)
+
+
 if __name__ == "__main__":
     unittest.main()
