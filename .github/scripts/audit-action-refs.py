@@ -20,7 +20,7 @@ def find_workflows(root: str) -> list[str]:
     return matches
 
 
-FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def action_refs(content: str) -> list[str]:
@@ -30,6 +30,8 @@ def action_refs(content: str) -> list[str]:
         line = line.strip()
         if line.startswith("uses:") or line.startswith("- uses:"):
             value = line.split("uses:", 1)[1].strip().strip('"').strip("'")
+            # Drop trailing YAML inline comments (e.g. "@<sha> # v7").
+            value = value.split("#", 1)[0].strip()
             if "@" in value and not value.startswith("./"):
                 refs.append(value)
     return refs
@@ -44,8 +46,12 @@ def audit(paths: list[str]) -> dict[str, list[str]]:
     """Map each workflow file to its floating (unpinned) action refs."""
     findings = {}
     for path in paths:
-        with open(path) as handle:
-            content = handle.read()
+        try:
+            with open(path) as handle:
+                content = handle.read()
+        except OSError as exc:
+            print(f"WARN: cannot read {path}: {exc}", file=sys.stderr)
+            continue
         floating = [ref for ref in action_refs(content) if not is_pinned(ref)]
         if floating:
             findings[path] = floating
