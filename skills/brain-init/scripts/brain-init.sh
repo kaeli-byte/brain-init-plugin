@@ -247,7 +247,7 @@ replace_runtime_code() (
 )
 
 # ── Defaults ──────────────────────────────────────────────────
-BRAIN_INIT_VERSION="1.2.0"
+BRAIN_INIT_VERSION="1.3.0"
 DOMAIN="${BRAIN_DOMAIN:-industrial-intelligence}"
 DOMAIN_CUSTOM=""
 VAULT_PATH=""

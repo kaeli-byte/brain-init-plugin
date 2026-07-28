@@ -63,32 +63,64 @@ Update harness files from the plugin's bundled assets while preserving all wiki 
 → Updated 23 harness files. Wiki content preserved (142 pages).
 ```
 
-## Capture runtime (shadow mode)
+## Capture → staged reconcile → canonical claim flow
 
-When the runtime is installed, capture uses shadow instrumentation by default:
+Capture and reconcile form one loop over each source:
 
-```bash
-# default when the runtime is installed
-/second-brain-capture raw/annual-reports/acme-2025.pdf
+1. **Capture stages candidates.** `/second-brain-capture` converts a source,
+   extracts 2–6 material candidate claims, and writes them into a canonical
+   reconciliation record at `wiki/reconciliations/reconcile-<source-id>.md`.
+   The source page links the record via its `reconciliation` field and starts
+   with `key_claims: []`.
+2. **Reconcile decides.** `/second-brain-reconcile` classifies every candidate
+   against the canonical graph into one of six dispositions and mutates the
+   graph accordingly. Reconcile is the only mutating orchestrator.
+3. **Capture settles.** The source page's `key_claims` are settled from the
+   terminal applied results, and entities, index, and log are updated.
 
-# explicitly disable shadow instrumentation for a session
-export BRAIN_RUNTIME_MODE=off
-claude
+Dispositions split into two classes:
+
+| Disposition | Effect | Review |
+|---|---|---|
+| `new` | Creates a new claim page | Applied automatically |
+| `corroborating` | Adds source evidence to the target claim | Applied automatically |
+| `irrelevant` | Recorded as rejected; no graph mutation | Applied automatically |
+| `updating` | Sets `valid_from`/`valid_to` bounds or `superseded_by` links on the target | **Inline human review** |
+| `contradicting` | Marks both claims `disputed` with opposing `counter_evidence` and reciprocal `## Related Claims` links | **Inline human review** |
+| `superseding` | Links the new claim via `superseded_by`; the old claim is preserved, never deleted | **Inline human review** |
+
+Sensitive dispositions (`updating`, `contradicting`, `superseding`) are gated
+behind one inline **Approve / Reject / Defer** question per candidate. The
+decision is persisted in the record (`reviewed_by`, `reviewed_at`,
+`review_note`) **before** any mutation, so the graph never changes without a
+recorded human decision.
+
+If review is deferred or the run stops early, the record stays
+`pending_review` or `incomplete` and can be resumed with:
+
+```
+/second-brain-reconcile <source-id>
 ```
 
-An instrumented capture can write these operational records under its run
-directory:
+**Legacy bootstrap.** A source that predates the reconcile contract (linked
+claims in `key_claims` but no record) is bootstrapped: candidates are derived
+from the linked claims with `origin: legacy`, every linked claim is
+represented without truncation, existing claim bytes are unchanged before
+approval, and the resulting record is resumable like any other.
 
-```text
-.brain/runs/<run-id>/manifest.json
-.brain/runs/<run-id>/events.jsonl
-.brain/runs/<run-id>/plan.json          # optional when planning is used
-.brain/runs/<run-id>/artifacts.json
-.brain/runs/<run-id>/verification.json
-```
+**Shadow runtime.** When the Brain Runtime is installed, both capture and
+reconcile run under shadow instrumentation (`RunSpec.mode == "shadow"`): the
+runtime snapshots `wiki/`, validates declared artifacts and run events, and
+reports `Runtime shadow: ACCEPT` or `REJECT`. A shadow `REJECT` is advisory —
+it never alters, removes, or rolls back the authoritative reconciliation.
+`BRAIN_RUNTIME_MODE=off` is a skill-level contract: with it, the skill never
+invokes the runtime CLI, but staging, classification, review, and apply still
+run unchanged.
 
-These files are operational records, not canonical wiki knowledge. A shadow
-`REJECT` is advisory and does not alter, remove, or roll back capture results.
+**Ownership.** The reconciliation record under `wiki/reconciliations/` is
+canonical, git-tracked knowledge. Run snapshots under `.brain/runs/<run-id>/`
+are operational records — git-ignored, never containing source bodies, model
+transcripts, or chain-of-thought.
 
 ## Domain Presets
 
@@ -121,11 +153,11 @@ These files are operational records, not canonical wiki knowledge. A shadow
 
 ```
 my-brain/
-├── wiki/            # 17 category directories (claims, companies, sources, ...)
+├── wiki/            # 18 category directories (claims, companies, sources, reconciliations, ...)
 ├── raw/             # 11 source directories (10k, patents, reports, ...)
 ├── templates/       # 18 YAML schemas + Base views
 ├── config/          # purpose.md, materiality.md, retrieval.md
-├── .claude/         # hooks, agents (3), skills (5)
+├── .claude/         # hooks, agents (3), skills (7)
 ├── .obsidian/       # vault config, plugins (dataview, templater, obsidian-git)
 ├── CLAUDE.md        # Domain-adapted schema
 ├── .env.example     # Token placeholders
@@ -172,7 +204,7 @@ All are WARN-level — none block vault initialization.
 
 | Skill | Coverage |
 |---|---|
-| `second-brain` | Wiki operations — /second-brain-capture, /second-brain-query, /second-brain-lint, /second-brain-synthesize, /second-brain-investigate, /second-brain-reconcile, /second-brain-status |
+| `second-brain` | Wiki operations (7 scoped skills) — /second-brain-capture, /second-brain-query, /second-brain-lint, /second-brain-synthesize, /second-brain-investigate, /second-brain-reconcile, /second-brain-status |
 | `mineru-batch` | PDF → Markdown conversion (all languages) |
 | `cfi-filings` | Chinese A-share periodic filings |
 | `sec-edgar` | US SEC EDGAR — company info, financials, XBRL |
