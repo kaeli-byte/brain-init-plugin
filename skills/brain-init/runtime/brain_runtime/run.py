@@ -317,6 +317,7 @@ def _artifact_kind(relative_path: Path) -> str:
         "processes": "process",
         "products": "product",
         "queries": "query",
+        "reconciliations": "reconciliation",
         "regulations": "regulation",
         "sources": "source",
         "standards": "standard",

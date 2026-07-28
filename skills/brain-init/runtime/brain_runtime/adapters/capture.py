@@ -8,6 +8,16 @@ import yaml
 from ..contracts import ArtifactRef, CheckResult
 from ..run import sha256_file
 from ..trace import read_events, read_json_nofollow
+from .common import (
+    SHA256,
+    WIKILINK,
+    check_result,
+    confined_path,
+    missing_fields,
+    normalized_text,
+    read_frontmatter,
+    wikilinks,
+)
 
 
 CLAIM_REQUIRED = {
@@ -32,83 +42,7 @@ SOURCE_RELIABILITY = {
 MATERIALITY = {"high", "medium", "low"}
 COMPANY_REQUIRED = {"company_id", "legal_name", "last_reviewed"}
 
-WIKILINK = re.compile(r"\[\[([^|\]#]+)")
-SHA256 = re.compile(r"^[0-9a-f]{64}$")
 RECOGNIZED_LONG_PROFILES = {"annual-report-v1", "sec-filing-v1"}
-
-
-def read_frontmatter(path: Path) -> tuple[dict, str]:
-    text = path.read_text(encoding="utf-8")
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        raise ValueError("missing YAML frontmatter")
-    try:
-        closing = next(
-            index for index, line in enumerate(lines[1:], start=1)
-            if line.strip() == "---"
-        )
-    except StopIteration as error:
-        raise ValueError("unterminated YAML frontmatter") from error
-    loaded = yaml.safe_load("\n".join(lines[1:closing]))
-    if not isinstance(loaded, dict):
-        raise ValueError("frontmatter must be a YAML mapping")
-    return loaded, "\n".join(lines[closing + 1:])
-
-
-def _check(
-    check_id: str,
-    passed: bool,
-    *,
-    artifact: str | None = None,
-    message: str = "",
-    severity: str = "critical",
-) -> CheckResult:
-    return CheckResult(
-        id=check_id,
-        passed=passed,
-        severity=severity,
-        artifact=artifact,
-        message="" if passed else message,
-    )
-
-
-def _missing(data: dict[str, Any], required: set[str]) -> list[str]:
-    return sorted(field for field in required if field not in data)
-
-
-def _links(value: Any, prefix: str) -> list[str]:
-    if isinstance(value, str):
-        return [
-            target for target in WIKILINK.findall(value)
-            if target.startswith(prefix)
-        ]
-    if isinstance(value, dict):
-        links: list[str] = []
-        for child in value.values():
-            links.extend(_links(child, prefix))
-        return links
-    if isinstance(value, list):
-        links = []
-        for child in value:
-            links.extend(_links(child, prefix))
-        return links
-    return []
-
-
-def _normalized(text: str) -> str:
-    return " ".join(text.split())
-
-
-def _confined_path(vault: Path, path_text: str) -> Path | None:
-    requested = Path(path_text)
-    if requested.is_absolute():
-        return None
-    resolved = (vault / requested).resolve()
-    try:
-        resolved.relative_to(vault)
-    except ValueError:
-        return None
-    return resolved
 
 
 def _evidence_checks(
@@ -118,8 +52,8 @@ def _evidence_checks(
     declared: set[str],
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
-    links = _links(evidence, "src-")
-    checks.append(_check(
+    links = wikilinks(evidence, "src-")
+    checks.append(check_result(
         "claim.source_evidence",
         bool(links),
         artifact=artifact_path,
@@ -131,7 +65,7 @@ def _evidence_checks(
         and (vault / path_text).is_file()
         for path_text in source_paths
     )
-    checks.append(_check(
+    checks.append(check_result(
         "claim.source_page_exists",
         sources_exist,
         artifact=artifact_path,
@@ -144,7 +78,7 @@ def _evidence_checks(
     for entry in entries:
         if not isinstance(entry, dict) or not entry.get("passage"):
             continue
-        entry_links = _links(entry.get("source"), "src-")
+        entry_links = wikilinks(entry.get("source"), "src-")
         if not entry_links:
             critical_messages.append("structured evidence source link is missing")
             continue
@@ -158,12 +92,12 @@ def _evidence_checks(
             critical_messages.append("linked source frontmatter is unavailable")
             continue
         raw_path = source_data.get("raw_path")
-        raw_file = _confined_path(vault, raw_path) if isinstance(raw_path, str) else None
+        raw_file = confined_path(vault, raw_path) if isinstance(raw_path, str) else None
         converted = raw_file.with_suffix(".md") if raw_file is not None else None
         if converted is None or not converted.is_file():
             converted_unavailable = True
             continue
-        if _normalized(str(entry["passage"])) not in _normalized(
+        if normalized_text(str(entry["passage"])) not in normalized_text(
             converted.read_text(encoding="utf-8")
         ):
             critical_messages.append(
@@ -181,7 +115,7 @@ def _evidence_checks(
     else:
         locator_message = ""
         locator_severity = "critical"
-    checks.append(_check(
+    checks.append(check_result(
         "evidence.locator_resolves",
         locator_passed,
         artifact=artifact_path,
@@ -197,21 +131,21 @@ def _claim_checks(
     data: dict[str, Any],
     declared: set[str],
 ) -> list[CheckResult]:
-    missing = _missing(data, CLAIM_REQUIRED)
+    missing = missing_fields(data, CLAIM_REQUIRED)
     checks = [
-        _check(
+        check_result(
             "claim.required_fields",
             not missing,
             artifact=artifact.path,
             message=f"missing required fields: {', '.join(missing)}",
         ),
-        _check(
+        check_result(
             "claim.confidence_enum",
             data.get("confidence") in CLAIM_CONFIDENCE,
             artifact=artifact.path,
             message="invalid claim confidence",
         ),
-        _check(
+        check_result(
             "claim.status_enum",
             data.get("status") in CLAIM_STATUS,
             artifact=artifact.path,
@@ -234,13 +168,13 @@ def _source_checks(
     body: str,
     declared: set[str],
 ) -> list[CheckResult]:
-    missing = _missing(data, SOURCE_REQUIRED)
+    missing = missing_fields(data, SOURCE_REQUIRED)
     enums_valid = (
         data.get("source_type") in SOURCE_TYPE
         and data.get("reliability") in SOURCE_RELIABILITY
         and data.get("materiality") in MATERIALITY
     )
-    company_links = _links(body, "company-")
+    company_links = wikilinks(body, "company-")
     backlink_valid = bool(company_links)
     for company_target in company_links:
         company_relative = f"wiki/companies/{company_target}.md"
@@ -255,25 +189,25 @@ def _source_checks(
         if f"[[{Path(artifact.path).stem}]]" not in company_body:
             backlink_valid = False
     return [
-        _check(
+        check_result(
             "source.required_fields",
             not missing,
             artifact=artifact.path,
             message=f"missing required fields: {', '.join(missing)}",
         ),
-        _check(
+        check_result(
             "source.enum_values",
             enums_valid,
             artifact=artifact.path,
             message="invalid source enum value",
         ),
-        _check(
+        check_result(
             "source.company_link",
             bool(company_links),
             artifact=artifact.path,
             message="source page must link at least one company",
         ),
-        _check(
+        check_result(
             "company.source_backlink",
             backlink_valid,
             artifact=artifact.path,
@@ -327,24 +261,24 @@ def _workflow_checks(vault: Path, run_dir: Path) -> list[CheckResult]:
         for event in events
     )
     return [
-        _check(
+        check_result(
             "capture.profile_recognized",
             profile_valid,
             message="long annual-report/10-K capture requires a recognized profile",
         ),
-        _check(
+        check_result(
             "capture.section_plan",
             plan_valid,
             message="section plan was not recorded",
             severity="warning",
         ),
-        _check(
+        check_result(
             "workflow.qmd_refresh",
             qmd_valid,
             message="qmd refresh unavailable, absent, or failed",
             severity="warning",
         ),
-        _check(
+        check_result(
             "workflow.log_completed",
             log_valid,
             message="finalized capture log completion was not recorded",
@@ -367,7 +301,7 @@ def capture_checks(
     for artifact in artifacts:
         if artifact.kind in kinds:
             kinds[artifact.kind] += 1
-        path = _confined_path(vault_root, artifact.path)
+        path = confined_path(vault_root, artifact.path)
         exists = path is not None and path.is_file()
         digest_valid = (
             exists
@@ -375,13 +309,13 @@ def capture_checks(
             and sha256_file(path) == artifact.sha256
         )
         checks.extend([
-            _check(
+            check_result(
                 "artifact.exists",
                 exists,
                 artifact=artifact.path,
                 message="declared artifact does not exist within the vault",
             ),
-            _check(
+            check_result(
                 "artifact.sha256",
                 digest_valid,
                 artifact=artifact.path,
@@ -396,14 +330,14 @@ def capture_checks(
         try:
             data, body = read_frontmatter(path)
         except (OSError, ValueError, yaml.YAMLError) as error:
-            checks.append(_check(
+            checks.append(check_result(
                 "frontmatter.valid_yaml",
                 False,
                 artifact=artifact.path,
                 message=str(error),
             ))
             continue
-        checks.append(_check(
+        checks.append(check_result(
             "frontmatter.valid_yaml",
             True,
             artifact=artifact.path,
@@ -412,7 +346,7 @@ def capture_checks(
             claim_id = data.get("claim_id")
             if isinstance(claim_id, str) and claim_id:
                 duplicate = claim_id in seen_claim_ids
-                checks.append(_check(
+                checks.append(check_result(
                     "claim.id_unique",
                     not duplicate,
                     artifact=artifact.path,
@@ -424,7 +358,7 @@ def capture_checks(
             source_id = data.get("source_id")
             if isinstance(source_id, str) and source_id:
                 duplicate = source_id in seen_source_ids
-                checks.append(_check(
+                checks.append(check_result(
                     "source.id_unique",
                     not duplicate,
                     artifact=artifact.path,
@@ -439,8 +373,8 @@ def capture_checks(
                 declared,
             ))
         elif artifact.kind == "company":
-            missing = _missing(data, COMPANY_REQUIRED)
-            checks.append(_check(
+            missing = missing_fields(data, COMPANY_REQUIRED)
+            checks.append(check_result(
                 "company.required_fields",
                 not missing,
                 artifact=artifact.path,
@@ -451,7 +385,7 @@ def capture_checks(
             # workflow.log_completed is its authoritative integrity signal.
             continue
         else:
-            checks.append(_check(
+            checks.append(check_result(
                 "page.last_reviewed",
                 "last_reviewed" in data,
                 artifact=artifact.path,
@@ -459,23 +393,23 @@ def capture_checks(
             ))
 
     checks.extend([
-        _check(
+        check_result(
             "capture.claim_count_min",
             kinds["claim"] >= 2,
             message="capture must declare at least two claim pages",
         ),
-        _check(
+        check_result(
             "capture.claim_count_max",
             kinds["claim"] <= 6,
             message="capture declares more than six claims",
             severity="warning",
         ),
-        _check(
+        check_result(
             "capture.source_count",
             kinds["source"] == 1,
             message="capture must declare exactly one source page",
         ),
-        _check(
+        check_result(
             "capture.company_count",
             kinds["company"] >= 1,
             message="capture must declare at least one company page",
