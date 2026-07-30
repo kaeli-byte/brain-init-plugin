@@ -163,7 +163,7 @@ jobs:
       # failing the workflow — the review is advisory.
       - name: Run OpenCodeReview
         continue-on-error: true
-        uses: alibaba/open-code-review@2e9938780b941e46b76ab3340e718e280b10c66f
+        uses: alibaba/open-code-review@d55f5e5940fcbe1881b31c7b7ff8bc921462c2c2
         with:
           llm_url: ${{ secrets.OCR_LLM_URL }}
           llm_auth_token: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
