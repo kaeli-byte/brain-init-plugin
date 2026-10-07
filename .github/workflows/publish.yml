@@ -120,7 +120,7 @@ jobs:
           cat CHANGELOG.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@5018f9ec04d67dca7353bf3f40a0933e8d7ddf24 # v3
+        uses: softprops/action-gh-release@b5a645e6d7f681d09866ab86ba7918b222989555 # v3
         with:
           name: ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
